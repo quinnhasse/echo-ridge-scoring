@@ -1,5 +1,5 @@
 import math
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from .schema import CompanySchema
 
 
@@ -89,6 +89,17 @@ class NormContext:
         
         return normalized_features
     
+    def get_raw_log_features(self, company: CompanySchema) -> Dict[str, float]:
+        """Get raw log-transformed features for scoring (without z-score normalization)"""
+        if not self._fitted:
+            raise ValueError("NormContext must be fitted before extracting features")
+        
+        # Check confidence threshold
+        if company.meta.source_confidence < self.confidence_threshold:
+            return {}
+        
+        return self._extract_raw_features(company)
+    
     def _extract_raw_features(self, company: CompanySchema) -> Dict[str, float]:
         """Extract features with log transforms already applied (Stage 1 + Stage 2 prep)"""
         features = {}
@@ -112,6 +123,18 @@ class NormContext:
         features['market_rivalry_index'] = company.market.rivalry_index
         
         # Budget features (log-transformed)
+        features['budget_revenue_est_usd_log'] = log10p(company.budget.revenue_est_usd)
+        
+        return features
+    
+    def get_raw_log_features(self, company: CompanySchema) -> Dict[str, float]:
+        """Extract raw log-transformed features without z-score normalization"""
+        features = {}
+        
+        # Info flow features (raw log-transformed)
+        features['info_flow_daily_docs_est_log'] = log10p(float(company.info_flow.daily_docs_est))
+        
+        # Budget features (raw log-transformed)  
         features['budget_revenue_est_usd_log'] = log10p(company.budget.revenue_est_usd)
         
         return features
