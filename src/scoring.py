@@ -1,4 +1,3 @@
-import math
 from typing import Dict, List, Any
 from .schema import CompanySchema
 from .normalization import NormContext
@@ -267,6 +266,16 @@ class SubscoreCalculator:
                 "inputs_used": {},
                 "warnings": warnings
             }
+    
+    def calculate_subscores(self, company: CompanySchema) -> Dict[str, Dict[str, Any]]:
+        """Calculate all five subscores (D/O/I/M/B) for a company"""
+        return {
+            "digital": self.calculate_digital_subscore(company),
+            "ops": self.calculate_ops_subscore(company),
+            "info_flow": self.calculate_info_flow_subscore(company),
+            "market": self.calculate_market_subscore(company),
+            "budget": self.calculate_budget_subscore(company)
+        }
 
 
 class FinalScorer:
@@ -322,7 +331,7 @@ class FinalScorer:
                 })
             
             # Generate explanation
-            reason_text = self._generate_explanation(scores, contributions, all_warnings)
+            reason_text = self._generate_explanation(contributions, all_warnings)
             
             # Calculate confidence
             confidence = self._calculate_confidence(scores, all_warnings)
@@ -348,7 +357,7 @@ class FinalScorer:
                 'interpretation': 'Error - Score could not be calculated'
             }
     
-    def _generate_explanation(self, scores: Dict[str, float], contributions: List[Dict], warnings: List[str]) -> str:
+    def _generate_explanation(self, contributions: List[Dict], warnings: List[str]) -> str:
         """Generate natural language explanation of the score"""
         try:
             # Sort contributions by impact
@@ -421,3 +430,26 @@ class FinalScorer:
             return "Fair - Moderate risk, additional review needed"
         else:
             return "Poor - High risk, detailed analysis required"
+    
+    def score(self, subscores: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        """Calculate final weighted score and generate explanation (alias for calculate_final_score)"""
+        result = self.calculate_final_score(subscores)
+        # Rename 'score' to 'final_score' for consistency with example_usage.py
+        result['final_score'] = result.pop('score')
+        
+        # Add subscores with weighted contributions for example_usage.py
+        result['subscores'] = {}
+        for name, subscore_data in subscores.items():
+            weight = self.weights.get(name, 0.0)
+            weighted_contribution = 100 * weight * subscore_data['value']
+            result['subscores'][name] = {
+                'value': subscore_data['value'],
+                'weighted_contribution': weighted_contribution,
+                'inputs_used': subscore_data['inputs_used'],
+                'warnings': subscore_data['warnings']
+            }
+        
+        # Rename 'reason_text' to 'explanation' for consistency
+        result['explanation'] = result.pop('reason_text')
+        
+        return result

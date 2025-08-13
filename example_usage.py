@@ -84,15 +84,18 @@ def main():
     
     # Initialize scoring system
     print("2. Initializing scoring system...")
-    final_scorer = FinalScorer(norm_context)
+    final_scorer = FinalScorer()
     print("   ✓ DOIMB scoring framework ready\n")
     
     # Score each company
     print("3. Calculating scores for all companies...\n")
     
     results = []
+
     for company in companies:
-        result = final_scorer.calculate_final_score(company)
+        subscore_calc = SubscoreCalculator(norm_context)
+        subscores = subscore_calc.calculate_subscores(company)
+        result = final_scorer.score(subscores)
         results.append((company, result))
         
         print(f"--- {company.domain} ---")
