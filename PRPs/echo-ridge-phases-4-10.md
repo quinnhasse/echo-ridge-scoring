@@ -50,6 +50,8 @@ Implement 7 distinct phases with specific deliverables and validation criteria:
 - url: https://fastapi.tiangolo.com/tutorial/body/
   why: Request body validation patterns with Pydantic
   critical: Schema validation with precise error messages
+  - OpenAPI spec must include copy-paste request/response examples for all endpoints. 
+  - Error messages must be precise and developer-friendly, indicating exactly which field or constraint failed.
 
 - url: https://docs.pytest.org/en/stable/explanation/goodpractices.html
   why: Pytest testing patterns for unit and integration tests
@@ -179,7 +181,11 @@ class ScoringPayloadV2(BaseModel):
     feasibility: FeasibilityGates
     company_id: str
     timestamp: datetime
+    # REQUIREMENT: Every risk/feasibility flag must include an explicit deterministic reason string
+    # (e.g., `feasibility=false` because `missing revenue_est_usd`, or `risk=high` because `source_confidence <0.5`).
+    # These reasons must be attached to the payload for downstream filtering.
 ```
+- Every risk/feasibility flag must include an explicit deterministic reason string (e.g., `feasibility=false` because `missing revenue_est_usd`, or `risk=high` because `source_confidence < 0.5`). These reasons must be attached to the payload for downstream filtering.
 
 ### Phase 5: Batch Runner & Persistence
 
@@ -282,8 +288,8 @@ Phase 6 - REST Service:
       
   Task 6.3:
     ADD OpenAPI documentation:
-      - INCLUDE copy-paste examples for downstream agents
-      - DOCUMENT error responses and validation messages
+      - INCLUDE copy-paste request/response examples for all endpoints
+      - DOCUMENT error responses with precise, developer-friendly messages (indicating exactly which field failed)
       - TEST contract compatibility with Opportunity Validation Agent
 
 Phase 7 - Back-testing & Calibration:
@@ -298,6 +304,7 @@ Phase 7 - Back-testing & Calibration:
       - FREEZE current D/O/I/M/B weights (0.25/0.20/0.20/0.20/0.15)
       - ADD version control and change control process
       - DOCUMENT weight meaning and calibration evidence
+      - FREEZE weights.yaml as v1.0 once calibration metrics are validated. Tag release (weights@1.0, scorer@1.0.0).
       
   Task 7.3:
     IMPLEMENT calibration validation:
@@ -310,7 +317,7 @@ Phase 8 - Sensitivity & Drift Detection:
     CREATE src/drift.py:
       - IMPLEMENT ±10% weight sweeps with Kendall τ calculation
       - ADD input distribution monitoring (mean/σ deltas)
-      - DESIGN alert thresholds for meaningful changes
+      - DESIGN and DOCUMENT alert thresholds (e.g., drift >3σ, null-rate increase >10%) so alarms only fire when statistically meaningful.
       
   Task 8.2:
     ADD drift detection pipeline:
@@ -333,7 +340,7 @@ Phase 9 - Observability & QA:
       
   Task 9.2:
     ADD comprehensive testing:
-      - IMPLEMENT property-based tests with Hypothesis
+      - IMPLEMENT property-based tests with Hypothesis to validate scoring invariants
       - ADD fuzz testing for schema validation
       - CREATE chaos testing for error scenarios
       
@@ -342,6 +349,12 @@ Phase 9 - Observability & QA:
       - WRITE SLOs and error budget definitions
       - DOCUMENT deployment and rollback procedures
       - CREATE troubleshooting runbook for on-call
+  
+  Task 9.4:
+    CREATE docs/runbook.md:
+      - DOCUMENT SLOs (latency/error budgets)
+      - OUTLINE deploy and rollback procedures
+      - INCLUDE troubleshooting guidance for on-call engineers
 
 Phase 10 - Downstream Enablement:
   Task 10.1:
@@ -354,7 +367,8 @@ Phase 10 - Downstream Enablement:
     CREATE integration examples:
       - WRITE curl examples for all API endpoints
       - DEMONSTRATE SDK usage patterns
-      - PROVIDE "hello-world" 15-minute setup guide
+      - PROVIDE "hello-world" doc that demonstrates scoring a JSONL end-to-end in under 15 minutes
+      - VALIDATE SDK and examples with Opportunity Validation Agent and Report Generation Agent to ensure zero downstream code changes
       
   Task 10.3:
     VALIDATE downstream integration:
@@ -453,7 +467,8 @@ async def score_single_company(
 ```yaml
 DATABASE:
   - table: scoring_results (company_id, score, breakdown, timestamp, norm_stats_id)
-  - table: norm_contexts (id, stats_json, created_at, version)
+   - Enforce checksum reproducibility: same input file + same NormContext ⇒ identical output file checksum and DB rows. Contract tests must verify this deterministically.
+   - table: norm_contexts (id, stats_json, created_at, version)
   - indexes: company_id, timestamp for efficient querying
 
 CONFIG:
