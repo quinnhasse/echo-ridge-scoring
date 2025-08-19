@@ -29,11 +29,11 @@ Reference: see `Echo_Ridge_Algorithm_Phases1.pdf` for phase specs [oai_citation:
 ## Examples
 Use the following reference implementations (in `examples/`):
 
-- **examples/01_gx_gates/** — Great Expectations minimal suite. Shows data quality rules, missing-field penalties, and clear validation errors (fit for Phase 4 + 5).  
-- **examples/02_evidently_drift/** — Evidently AI drift report. Notebook/script that detects distribution shift and generates HTML/PDF reports (fit for Phase 8).  
-- **examples/03_fastapi_scoring/** — FastAPI scoring service template with `POST /score`, OpenAPI docs, and schema validation (fit for Phase 6 + 10).  
-- **examples/04_hypothesis_tests/** — Hypothesis property-based tests for deterministic math and schema invariants (fit for Phase 9).  
-- **examples/05_generated_client/** — openapi-python-client SDK generation from OpenAPI spec. Produces callable `score_record()` helper (fit for Phase 10).  
+- **examples/great_expectations-develop/** — Great Expectations minimal suite. Shows data quality rules, missing-field penalties, and clear validation errors (fit for Phase 4 + 5).  
+- **examples/evidently-main/** — Evidently AI drift report. Notebook/script that detects distribution shift and generates HTML/PDF reports (fit for Phase 8).  
+- **examples/Integrating ML Models in FastAPI with Python.md** — FastAPI scoring service template with `POST /score`, OpenAPI docs, and schema validation (fit for Phase 6 + 10).  
+- **examples/hypothesis-master/** — Hypothesis property-based tests for deterministic math and schema invariants (fit for Phase 9).  
+- **examples/openaiapi-python-client-main/** — openapi-python-client SDK generation from OpenAPI spec. Produces callable `score_record()` helper (fit for Phase 10).  
 
 ---
 
