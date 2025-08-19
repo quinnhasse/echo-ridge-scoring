@@ -169,3 +169,7 @@ poetry.toml
 
 # LSP config files
 pyrightconfig.json
+
+# Claude PRP setup
+examples/
+Context-Engineering-Intro/
