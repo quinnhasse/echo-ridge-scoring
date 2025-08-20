@@ -1,15 +1,20 @@
 # Coding Style and Conventions
 
-## Code Style Requirements
-- **Follow PEP8** strictly
-- **Use type hints** for all function parameters and return values
-- **Format with `black`** for consistent code formatting
-- **Use `pydantic` for data validation** - already established pattern
-- **File Length Limit**: Never create files longer than 500 lines - refactor into modules
-- **Imports**: Prefer relative imports within packages
+## Language and Formatting
+- **Primary Language**: Python 3.11+
+- **Code Style**: PEP8 compliance
+- **Formatter**: Black (mentioned in CLAUDE.md)
+- **Type Hints**: Required for all functions and methods
+- **Data Validation**: Pydantic models for all data structures
+
+## File Size and Organization
+- **Maximum file size**: 500 lines of code per file
+- **Module organization**: Split by feature/responsibility when approaching limit
+- **Import style**: Prefer relative imports within packages
+- **Environment variables**: Use python_dotenv and load_env()
 
 ## Documentation Standards
-- **Google-style docstrings** for every function:
+- **Docstrings**: Required for every function using Google style:
   ```python
   def example():
       """
@@ -22,38 +27,29 @@
           type: Description.
       """
   ```
+- **Comments**: Non-obvious code requires explanation
+- **Reasoning comments**: Use `# Reason:` to explain why, not what
+- **Inline documentation**: Ensure mid-level developer comprehension
 
-## Code Organization Patterns
-- **Agent-based architecture** pattern used:
+## Testing Requirements
+- **Framework**: Pytest
+- **Test location**: `/tests` folder mirroring main app structure
+- **Minimum coverage**: Each feature requires:
+  - 1 test for expected use case
+  - 1 edge case test
+  - 1 failure case test
+- **Test execution**: Use venv_linux virtual environment
+
+## Naming and Structure
+- **Agent organization pattern**:
   - `agent.py` - Main agent definition and execution logic
   - `tools.py` - Tool functions used by the agent  
   - `prompts.py` - System prompts
-- **Clear module separation** by feature/responsibility
-- **Environment variables**: Use `python_dotenv` and `load_env()`
+- **Clear module separation**: Group by feature or responsibility
+- **Consistent patterns**: Follow existing architectural patterns
 
-## API and ORM Preferences
-- **FastAPI** for APIs (already configured)
-- **SQLAlchemy or SQLModel** for ORM if database needed
-- **Pydantic** for data validation (extensively used)
-
-## Code Quality Rules
-- **Comment non-obvious code** for mid-level developer understanding
-- **Add inline `# Reason:` comments** explaining why, not just what
-- **No assumptions**: Ask questions if uncertain rather than guessing
-- **No hallucination**: Only use known, verified Python packages
-- **Verify paths**: Always confirm file paths and module names exist
-
-## Testing Requirements
-- **Pytest** for all testing (configured)
-- **Test structure**: `/tests` folder mirroring main app structure
-- **Minimum test coverage**: 
-  - 1 test for expected use
-  - 1 edge case test
-  - 1 failure case test
-- **Update tests** when logic changes
-
-## Project-Specific Patterns
-- **Statistical approach**: Z-score normalization with confidence thresholds
-- **Explainable results**: Always provide natural language explanations
-- **Type safety**: Comprehensive Pydantic validation throughout
-- **Modular scoring**: Separate subscore calculation from final aggregation
+## Error Handling and Reliability
+- **Never assume missing context**: Ask questions if uncertain
+- **No hallucination**: Only use verified Python packages
+- **Path confirmation**: Always confirm file paths and module names exist
+- **Preserve existing code**: Never delete/overwrite unless explicitly instructed

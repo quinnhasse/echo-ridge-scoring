@@ -1,53 +1,40 @@
 # Tech Stack and Architecture
 
-## Technology Stack
-- **Primary Language**: Python 3.11+
-- **Package Management**: Poetry
-- **Data Validation**: Pydantic v2.11+
-- **API Framework**: FastAPI v0.116+
-- **Testing**: Pytest v8.4+
-- **Data Processing**: NumPy v2.3+, Pandas v2.3+
-- **Server**: Uvicorn v0.35+
-- **HTTP Client**: httpx v0.28+
+## Core Technology Stack
+- **Python**: ^3.11 (primary language)
+- **FastAPI**: ^0.116.1 (REST API framework)
+- **Pydantic**: ^2.11.7 (data validation and schema)
+- **SQLAlchemy**: ^2.0.36 / SQLModel: ^0.0.22 (ORM and database)
+- **Typer**: ^0.12.3 (CLI framework)
+- **Rich**: ^13.7.1 (CLI output formatting)
+- **NumPy**: ^2.3.2 / Pandas: ^2.3.1 (statistical processing)
+- **Pytest**: ^8.4.1 (testing framework)
 
-## Project Structure
+## Current Architecture
 ```
-echo-ridge-scoring/
-├── src/                     # Main Python package
-│   ├── __init__.py
-│   ├── schema.py            # Pydantic data models and validation (7 schemas)
-│   ├── normalization.py     # Statistical functions and NormContext class
-│   └── scoring.py           # SubscoreCalculator and FinalScorer classes
-├── PRPs/                    # Project Requirement Proposals
-│   └── templates/
-├── example_usage.py         # Complete demonstration script
-├── pyproject.toml          # Poetry configuration
-├── CLAUDE.md               # Project development guidelines
-├── README.md               # Project documentation
-└── [Research PDFs]         # Algorithm and market fit documentation
+src/
+├── schema.py           # Pydantic data models and validation
+├── normalization.py    # Statistical normalization and feature engineering
+├── scoring.py          # D/O/I/M/B subscore calculation and final scoring
+├── risk_feasibility.py # Risk assessment and feasibility gates
+├── batch.py            # Batch processing CLI logic
+├── persistence.py      # Database and NormContext storage
+└── api/                # FastAPI REST service
+    ├── main.py         # FastAPI application
+    ├── endpoints.py    # Scoring endpoints
+    ├── models.py       # API request/response models
+    └── dependencies.py # Dependency injection
 ```
 
-## Core Architecture Components
+## Database
+- **Primary**: SQLite (echo_ridge_scoring.db)
+- **Configurable**: Any SQLAlchemy-supported database via connection string
+- **Purpose**: NormContext persistence, batch tracking, audit trails
 
-### Schema Layer (schema.py)
-- **DigitalSchema**: Website and digital infrastructure metrics
-- **OpsSchema**: Operational complexity metrics  
-- **InfoFlowSchema**: Information processing capacity
-- **MarketSchema**: Market pressure and competition metrics
-- **BudgetSchema**: Financial capacity indicators
-- **MetaSchema**: Metadata and confidence tracking
-- **CompanySchema**: Main composite schema
-
-### Normalization Layer (normalization.py)
-- **NormContext**: Statistical normalization manager
-- **Utility Functions**: zscore, log10p, clip, flag_to_float
-
-### Scoring Layer (scoring.py)
-- **SubscoreCalculator**: Individual D/O/I/M/B calculations
-- **FinalScorer**: Weighted aggregation and explanation generation
-
-## Design Patterns
-- **Modular Architecture**: Clear separation between validation, normalization, and scoring
-- **Type Safety**: Full Pydantic validation and Python type hints
-- **Statistical Approach**: Z-score normalization with confidence thresholds
-- **Explainable AI**: Natural language generation for score explanations
+## Key Design Principles
+- **Deterministic**: Same inputs always produce identical outputs
+- **Explainable**: Natural language explanations for all scores
+- **Modular**: Clear separation of concerns across phases
+- **Type-safe**: Full Pydantic validation throughout
+- **Observable**: Structured logging and metrics
+- **Testable**: Comprehensive unit and integration tests

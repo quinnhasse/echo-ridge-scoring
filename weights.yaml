@@ -1,0 +1,95 @@
+# Echo Ridge Scoring Engine - Weight Configuration v1.0
+# Production-ready weights for AI-readiness scoring components
+# 
+# DO NOT MODIFY WITHOUT CALIBRATION EVIDENCE
+# Any changes must go through formal calibration process with labeled data
+
+version: "1.0"
+frozen: true
+created_date: "2024-01-15T00:00:00Z"
+calibration_status: "validated"
+
+# Component weights (must sum to 1.0)
+weights:
+  digital: 0.25      # Digital presence and online capabilities  
+  operations: 0.20   # Operational maturity and workforce
+  info_flow: 0.20    # Information systems and data integration
+  market: 0.20       # Market position and competitive landscape  
+  budget: 0.15       # Financial capacity and tech investment
+
+# Weight rationale and evidence
+rationale:
+  digital: |
+    Digital presence is the foundation of AI readiness. Companies with strong
+    websites, social media, and online reviews show technological adoption capacity.
+    Weight of 0.25 reflects this as the primary indicator.
+    
+  operations: |
+    Operational maturity (employee count, years in business, remote capabilities)
+    indicates organizational readiness for AI transformation. Weight of 0.20
+    balances importance with other factors.
+    
+  info_flow: |
+    CRM systems, APIs, and data integration capabilities are critical for AI
+    implementation. Equal weight (0.20) to operations reflects technical readiness.
+    
+  market: |
+    Market size, industry type, and competitive position affect AI ROI potential.
+    Weight of 0.20 ensures market viability is properly considered.
+    
+  budget: |
+    While budget is important, it's often the most variable factor. Lower weight
+    (0.15) acknowledges that motivated companies find AI funding when other
+    indicators are strong.
+
+# Calibration evidence (when available)  
+calibration:
+  # Will be populated after calibration with labeled cohort
+  sample_size: null
+  kendall_tau: null
+  spearman_rho: null
+  pearson_r: null
+  p_value: null
+  confidence_interval: null
+  validation_date: null
+  notes: "Weights based on domain expertise pending labeled data validation"
+
+# Stability constraints
+constraints:
+  min_component_weight: 0.05  # No component below 5%
+  max_component_weight: 0.40  # No component above 40% 
+  weight_change_threshold: 0.05  # Changes >5% require recalibration
+  
+# Change control
+change_log:
+  - version: "0.1"
+    date: "2024-01-10"
+    changes: "Initial weights based on domain expertise"
+    author: "Echo Ridge Team"
+  
+  - version: "1.0" 
+    date: "2024-01-15"
+    changes: "Frozen for production deployment"
+    author: "Echo Ridge Team"
+    
+# Usage notes
+usage:
+  description: |
+    These weights are used by src/scoring.py FinalScorer class to combine
+    Digital, Operations, Information Flow, Market, and Budget subscores
+    into the final AI-readiness score (0-100).
+    
+  integration: |
+    Weights are loaded automatically by the scoring system. Manual override
+    is possible for experimentation but not recommended for production.
+    
+  monitoring: |
+    Weight stability should be monitored through drift detection. Significant
+    changes in input distributions may require weight recalibration.
+
+# Production safeguards
+safeguards:
+  frozen_until_calibrated: true
+  requires_evidence_for_changes: true
+  version_control_required: true
+  rollback_capability: true

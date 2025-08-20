@@ -218,6 +218,18 @@ class PersistenceManager:
             ).first()
             
             return record.version if record else None
+
+    def get_latest_norm_context(self) -> Optional[NormContext]:
+        """
+        Get the most recent NormContext.
+        
+        Returns:
+            Latest NormContext instance or None if no contexts exist
+        """
+        version = self.get_latest_norm_context_version()
+        if version is None:
+            return None
+        return self.load_norm_context(version)
     
     def store_scoring_result(self, scoring_payload: ScoringPayloadV2, 
                            norm_context_version: str, processing_time_ms: Optional[float] = None,
