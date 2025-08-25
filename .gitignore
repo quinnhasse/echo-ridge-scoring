@@ -174,3 +174,8 @@ pyrightconfig.json
 examples/
 Context-Engineering-Intro/
 serena/
+PRPs/
+.serena/
+CLAUDE.md 
+INITIAL.md 
+TASK.md 
