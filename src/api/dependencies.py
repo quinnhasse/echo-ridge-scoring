@@ -34,9 +34,7 @@ async def get_batch_processor() -> BatchProcessor:
     try:
         persistence_manager = get_persistence_manager()
         processor = BatchProcessor(
-            persistence_manager=persistence_manager,
-            norm_context_manager=persistence_manager,
-            deterministic=False
+            persistence_manager=persistence_manager
         )
         return processor
     except Exception as e:

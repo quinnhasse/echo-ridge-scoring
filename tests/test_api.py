@@ -98,35 +98,29 @@ def sample_company_data() -> Dict[str, Any]:
         "company_id": "test-company-001",
         "domain": "test.com",
         "digital": {
-            "website_score": 85,
-            "social_media_presence": 70,
-            "online_review_score": 75,
-            "seo_score": 60
+            "pagespeed": 85,
+            "crm_flag": True,
+            "ecom_flag": False
         },
         "ops": {
-            "employee_count": 25,
-            "years_in_business": 5,
-            "is_remote_friendly": True
+            "employees": 25,
+            "locations": 2,
+            "services_count": 5
         },
         "info_flow": {
-            "crm_system": "salesforce",
-            "has_api": True,
-            "data_integration_score": 80
+            "daily_docs_est": 100
         },
         "market": {
-            "industry": "technology",
-            "market_size_score": 70,
-            "competition_level": 60
+            "competitor_density": 8,
+            "industry_growth_pct": 3.5,
+            "rivalry_index": 0.7
         },
         "budget": {
-            "revenue_est_usd": 1000000,
-            "tech_budget_pct": 10,
-            "is_budget_approved": True
+            "revenue_est_usd": 1000000
         },
         "meta": {
-            "source": "web_scrape",
-            "source_confidence": 0.85,
-            "data_freshness_days": 30
+            "scrape_ts": "2025-08-25T10:00:00Z",
+            "source_confidence": 0.85
         }
     }
 

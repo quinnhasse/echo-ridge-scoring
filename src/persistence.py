@@ -456,6 +456,13 @@ class PersistenceManager:
                 "input_checksum": record.input_checksum,
                 "output_checksum": record.output_checksum
             }
+    
+    async def close(self):
+        """
+        Close database connections for proper cleanup.
+        """
+        if hasattr(self, 'engine'):
+            self.engine.dispose()
 
 
 class NormContextManager:

@@ -1,0 +1,1 @@
+{"company_id":"demo","domain":"demo.com", "digital":{"pagespeed":70,"crm_flag":true,"ecom_flag":false}, "ops":{"employees":10,"locations":1,"services_count":3}, "info_flow":{"daily_docs_est":50}, "market":{"competitor_density":5,"industry_growth_pct":3.1,"rivalry_index":0.2}, "budget":{"revenue_est_usd":500000}, "meta":{"scrape_ts":"2025-08-07T17:15:00Z","source_confidence":0.9}}

@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timezone
 from typing import Dict, Any, List
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Body
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
@@ -32,9 +32,104 @@ API_VERSION = "1.0.0"
 
 
 
-@router.post("/score", response_model=ScoringPayloadV2, status_code=status.HTTP_200_OK)
+@router.post("/score", 
+            response_model=ScoringPayloadV2, 
+            status_code=status.HTTP_200_OK,
+            responses={
+                200: {
+                    "description": "Successful AI-readiness scoring",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "final_score": 75.5,
+                                "confidence": 0.85,
+                                "subscores": {
+                                    "digital": {"score": 80.0, "confidence": 0.9},
+                                    "ops": {"score": 70.0, "confidence": 0.8},
+                                    "info_flow": {"score": 85.0, "confidence": 0.85},
+                                    "market": {"score": 72.0, "confidence": 0.75},
+                                    "budget": {"score": 65.0, "confidence": 0.9}
+                                },
+                                "explanation": "Company demonstrates strong digital capabilities with good operational foundation.",
+                                "warnings": [],
+                                "risk": {
+                                    "data_confidence": 0.85,
+                                    "missing_field_penalty": 0.0,
+                                    "scrape_volatility": 0.15,
+                                    "overall_risk": "low"
+                                },
+                                "feasibility": {
+                                    "docs_present": True,
+                                    "crm_or_ecom_present": True,
+                                    "budget_above_floor": True,
+                                    "deployable_now": True,
+                                    "overall_feasible": True,
+                                    "reasons": []
+                                },
+                                "company_id": "acme-corp-001",
+                                "timestamp": "2025-08-25T10:30:00Z",
+                                "processing_time_ms": 45.2
+                            }
+                        }
+                    }
+                },
+                422: {
+                    "description": "Validation Error",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "detail": [
+                                    {
+                                        "type": "missing",
+                                        "loc": ["body", "digital", "pagespeed"],
+                                        "msg": "Field required",
+                                        "input": {"crm_flag": True, "ecom_flag": False}
+                                    },
+                                    {
+                                        "type": "greater_than_equal",
+                                        "loc": ["body", "budget", "revenue_est_usd"], 
+                                        "msg": "Input should be greater than or equal to 0",
+                                        "input": -1000
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            })
 async def score_single_company(
-    company: CompanySchema,
+    company: CompanySchema = Body(
+        ...,
+        examples=[{
+            "company_id": "acme-corp-001",
+            "domain": "acme.com",
+            "digital": {
+                "pagespeed": 85,
+                "crm_flag": True,
+                "ecom_flag": False
+            },
+            "ops": {
+                "employees": 25,
+                "locations": 2,
+                "services_count": 5
+            },
+            "info_flow": {
+                "daily_docs_est": 150
+            },
+            "market": {
+                "competitor_density": 8,
+                "industry_growth_pct": 3.5,
+                "rivalry_index": 0.7
+            },
+            "budget": {
+                "revenue_est_usd": 1500000
+            },
+            "meta": {
+                "scrape_ts": "2025-08-25T10:00:00Z",
+                "source_confidence": 0.85
+            }
+        }]
+    ),
     batch_processor: BatchProcessor = Depends(get_batch_processor),
     norm_context: NormContext = Depends(get_norm_context)
 ):
@@ -50,35 +145,29 @@ async def score_single_company(
         "company_id": "acme-corp-001",
         "domain": "acme.com",
         "digital": {
-            "website_score": 85,
-            "social_media_presence": 60,
-            "online_review_score": 75,
-            "seo_score": 50
+            "pagespeed": 85,
+            "crm_flag": True,
+            "ecom_flag": False
         },
         "ops": {
-            "employee_count": 25,
-            "years_in_business": 8,
-            "is_remote_friendly": true
+            "employees": 25,
+            "locations": 2,
+            "services_count": 5
         },
         "info_flow": {
-            "crm_system": "salesforce",
-            "has_api": true,
-            "data_integration_score": 70
+            "daily_docs_est": 150
         },
         "market": {
-            "industry": "retail",
-            "market_size_score": 80,
-            "competition_level": 60
+            "competitor_density": 8,
+            "industry_growth_pct": 3.5,
+            "rivalry_index": 0.7
         },
         "budget": {
-            "revenue_est_usd": 1500000,
-            "tech_budget_pct": 15,
-            "is_budget_approved": true
+            "revenue_est_usd": 1500000
         },
         "meta": {
-            "source": "web_scrape",
-            "source_confidence": 0.85,
-            "data_freshness_days": 30
+            "scrape_ts": "2025-08-25T10:00:00Z",
+            "source_confidence": 0.85
         }
     }
     ```
@@ -119,9 +208,125 @@ async def score_single_company(
         )
 
 
-@router.post("/score/batch", response_model=BatchScoreResponse, status_code=status.HTTP_200_OK)
+@router.post("/score/batch", 
+            response_model=BatchScoreResponse, 
+            status_code=status.HTTP_200_OK,
+            responses={
+                200: {
+                    "description": "Successful batch processing",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "results": [
+                                    {
+                                        "final_score": 78.2,
+                                        "confidence": 0.82,
+                                        "subscores": {
+                                            "digital": {"score": 85.0, "confidence": 0.9},
+                                            "ops": {"score": 72.0, "confidence": 0.85}
+                                        },
+                                        "explanation": "Company shows strong digital foundation.",
+                                        "company_id": "company-1",
+                                        "timestamp": "2025-08-25T10:30:00Z",
+                                        "processing_time_ms": 42.1
+                                    }
+                                ],
+                                "summary": {
+                                    "total_requested": 2,
+                                    "successful": 2,
+                                    "failed": 0,
+                                    "success_rate": 1.0
+                                },
+                                "processing_time_ms": 89.4
+                            }
+                        }
+                    }
+                },
+                422: {
+                    "description": "Validation Error",
+                    "content": {
+                        "application/json": {
+                            "example": {
+                                "detail": [
+                                    {
+                                        "type": "missing", 
+                                        "loc": ["body", "companies"],
+                                        "msg": "Field required",
+                                        "input": {"include_debug_info": False}
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            })
 async def score_batch_companies(
-    request: BatchScoreRequest,
+    request: BatchScoreRequest = Body(
+        ...,
+        examples=[{
+            "companies": [
+                {
+                    "company_id": "company-1",
+                    "domain": "example1.com",
+                    "digital": {
+                        "pagespeed": 85,
+                        "crm_flag": True,
+                        "ecom_flag": False
+                    },
+                    "ops": {
+                        "employees": 25,
+                        "locations": 2,
+                        "services_count": 5
+                    },
+                    "info_flow": {
+                        "daily_docs_est": 150
+                    },
+                    "market": {
+                        "competitor_density": 8,
+                        "industry_growth_pct": 3.5,
+                        "rivalry_index": 0.7
+                    },
+                    "budget": {
+                        "revenue_est_usd": 1500000
+                    },
+                    "meta": {
+                        "scrape_ts": "2025-08-25T10:00:00Z",
+                        "source_confidence": 0.85
+                    }
+                },
+                {
+                    "company_id": "company-2",
+                    "domain": "example2.com",
+                    "digital": {
+                        "pagespeed": 72,
+                        "crm_flag": False,
+                        "ecom_flag": True
+                    },
+                    "ops": {
+                        "employees": 50,
+                        "locations": 3,
+                        "services_count": 8
+                    },
+                    "info_flow": {
+                        "daily_docs_est": 300
+                    },
+                    "market": {
+                        "competitor_density": 12,
+                        "industry_growth_pct": 2.8,
+                        "rivalry_index": 0.8
+                    },
+                    "budget": {
+                        "revenue_est_usd": 2500000
+                    },
+                    "meta": {
+                        "scrape_ts": "2025-08-25T10:00:00Z",
+                        "source_confidence": 0.78
+                    }
+                }
+            ],
+            "include_debug_info": False
+        }]
+    ),
     batch_processor: BatchProcessor = Depends(get_batch_processor),
     norm_context: NormContext = Depends(get_norm_context)
 ):
@@ -138,12 +343,31 @@ async def score_batch_companies(
             {
                 "company_id": "company-1",
                 "domain": "example1.com",
-                // ... full company schema
-            },
-            {
-                "company_id": "company-2", 
-                "domain": "example2.com",
-                // ... full company schema
+                "digital": {
+                    "pagespeed": 85,
+                    "crm_flag": true,
+                    "ecom_flag": false
+                },
+                "ops": {
+                    "employees": 25,
+                    "locations": 2, 
+                    "services_count": 5
+                },
+                "info_flow": {
+                    "daily_docs_est": 150
+                },
+                "market": {
+                    "competitor_density": 8,
+                    "industry_growth_pct": 3.5,
+                    "rivalry_index": 0.7
+                },
+                "budget": {
+                    "revenue_est_usd": 1500000
+                },
+                "meta": {
+                    "scrape_ts": "2025-08-25T10:00:00Z",
+                    "source_confidence": 0.85
+                }
             }
         ],
         "include_debug_info": false
