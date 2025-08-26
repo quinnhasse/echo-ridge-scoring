@@ -24,26 +24,26 @@ class SubscoreCalculator:
                     "warnings": warnings
                 }
             
-            # Get normalized features
-            normalized_features = self.norm_context.apply(company)
+            # Get bounded normalized features [0,1]
+            bounded_features = self.norm_context.apply_bounded(company)
             
-            # Extract required features
-            pagespeed = normalized_features.get('digital_pagespeed', 0.0)
-            crm_flag = normalized_features.get('digital_crm_flag', 0.0) 
-            ecom_flag = normalized_features.get('digital_ecom_flag', 0.0)
+            # Extract required features (all in [0,1] range)
+            pagespeed = bounded_features.get('digital_pagespeed', 0.0)
+            crm_flag = bounded_features.get('digital_crm_flag', 0.0) 
+            ecom_flag = bounded_features.get('digital_ecom_flag', 0.0)
             
-            # Calculate Digital score
+            # Calculate Digital score (result in [0,1] range)
             digital_score = 0.4 * pagespeed + 0.3 * crm_flag + 0.3 * ecom_flag
             
             inputs_used = {
-                'pagespeed_zscore': pagespeed,
-                'crm_flag_zscore': crm_flag,
-                'ecom_flag_zscore': ecom_flag,
+                'pagespeed_normalized': pagespeed,
+                'crm_flag_normalized': crm_flag,
+                'ecom_flag_normalized': ecom_flag,
                 'weights': {'pagespeed': 0.4, 'crm': 0.3, 'ecom': 0.3}
             }
             
             # Add warnings for extreme values
-            if abs(pagespeed) > 2.0:
+            if pagespeed < 0.1 or pagespeed > 0.9:
                 warnings.append("OUTLIER: Page speed significantly above/below average")
             
             return {
@@ -75,27 +75,30 @@ class SubscoreCalculator:
                     "warnings": warnings
                 }
             
-            # Get normalized features
-            normalized_features = self.norm_context.apply(company)
+            # Get bounded normalized features [0,1]
+            bounded_features = self.norm_context.apply_bounded(company)
             
-            # Extract required features
-            employees = normalized_features.get('ops_employees_log', 0.0)
-            locations = normalized_features.get('ops_locations_log', 0.0)
-            services = normalized_features.get('ops_services_count_log', 0.0)
+            # Extract required features (all in [0,1] range)
+            employees = bounded_features.get('ops_employees_log', 0.0)
+            locations = bounded_features.get('ops_locations_log', 0.0)
+            services = bounded_features.get('ops_services_count_log', 0.0)
             
-            # Calculate Operations score (SUM, not average per Echo Ridge spec)
-            ops_score = employees + locations + services
+            # Calculate Operations score (normalized SUM divided by 3 to get [0,1] range)
+            # Reason: Original spec was SUM, but with [0,1] inputs we need to scale appropriately
+            ops_score = (employees + locations + services) / 3.0
             
             inputs_used = {
-                'employees_zscore': employees,
-                'locations_zscore': locations,
-                'services_zscore': services,
-                'formula': 'z_employees + z_locations + z_services'
+                'employees_normalized': employees,
+                'locations_normalized': locations,
+                'services_normalized': services,
+                'formula': '(employees + locations + services) / 3'
             }
             
-            # Add warnings for extreme values
-            if abs(ops_score) > 6.0:
-                warnings.append("OUTLIER: Operations metrics significantly above/below average")
+            # Add warnings for extreme values in [0,1] range
+            if ops_score > 0.9:
+                warnings.append("OUTLIER: Operations metrics significantly above average")
+            elif ops_score < 0.1:
+                warnings.append("OUTLIER: Operations metrics significantly below average")
             
             return {
                 "value": ops_score,
@@ -126,19 +129,19 @@ class SubscoreCalculator:
                     "warnings": warnings
                 }
             
-            # Get raw log features (not z-scored)
-            raw_log_features = self.norm_context.get_raw_log_features(company)
+            # Get bounded normalized features [0,1]
+            bounded_features = self.norm_context.apply_bounded(company)
             
-            # Extract daily docs estimate (already log-transformed)
-            docs_log = raw_log_features.get('info_flow_daily_docs_est_log', 0.0)
+            # Extract daily docs feature (bounded normalized to [0,1])
+            docs_normalized = bounded_features.get('info_flow_daily_docs_est_log', 0.0)
             
-            # Calculate Info Flow score: log10(docs + 1)/4
-            info_flow_score = docs_log / 4.0
+            # Info Flow score is directly the normalized value (already in [0,1])
+            info_flow_score = docs_normalized
             
             inputs_used = {
                 'daily_docs_raw': company.info_flow.daily_docs_est,
-                'daily_docs_log': docs_log,
-                'formula': 'log10(docs + 1)/4'
+                'daily_docs_normalized': docs_normalized,
+                'formula': 'bounded_normalized(log10(docs + 1))'
             }
             
             # Add warnings
@@ -176,31 +179,32 @@ class SubscoreCalculator:
                     "warnings": warnings
                 }
             
-            # Get normalized features
-            normalized_features = self.norm_context.apply(company)
+            # Get bounded normalized features [0,1]
+            bounded_features = self.norm_context.apply_bounded(company)
             
-            # Extract required features
-            comp_density = normalized_features.get('market_competitor_density_log', 0.0)
-            industry_growth = normalized_features.get('market_industry_growth_pct', 0.0)
-            rivalry = normalized_features.get('market_rivalry_index', 0.0)
+            # Extract required features (all in [0,1] range)
+            comp_density = bounded_features.get('market_competitor_density_log', 0.0)
+            industry_growth = bounded_features.get('market_industry_growth_pct', 0.0)
+            rivalry = bounded_features.get('market_rivalry_index', 0.0)
             
-            # Calculate Market score: comp_density + industry_growth - rivalry
-            market_score = comp_density + industry_growth - rivalry
+            # Calculate Market score: (comp_density + industry_growth + (1-rivalry)) / 3
+            # Reason: Rivalry is inverted (1-rivalry) since high rivalry is negative, then normalized
+            market_score = (comp_density + industry_growth + (1.0 - rivalry)) / 3.0
             
             inputs_used = {
-                'competitor_density_zscore': comp_density,
-                'industry_growth_zscore': industry_growth,
-                'rivalry_index_zscore': rivalry,
-                'formula': 'z_comp_density + z_industry_growth - z_rivalry'
+                'competitor_density_normalized': comp_density,
+                'industry_growth_normalized': industry_growth,
+                'rivalry_index_normalized': rivalry,
+                'formula': '(comp_density + industry_growth + (1-rivalry)) / 3'
             }
             
-            # Add contextual warnings
-            if industry_growth > 1.5:
+            # Add contextual warnings for [0,1] normalized values
+            if industry_growth > 0.9:
                 warnings.append("HIGH_GROWTH: High growth industry detected")
-            elif industry_growth < -1.5:
+            elif industry_growth < 0.1:
                 warnings.append("DECLINING: Declining industry detected")
                 
-            if rivalry > 1.5:
+            if rivalry > 0.9:
                 warnings.append("HIGH_RIVALRY: Highly competitive market")
             
             return {
@@ -232,19 +236,19 @@ class SubscoreCalculator:
                     "warnings": warnings
                 }
             
-            # Get raw log features (not z-scored)
-            raw_log_features = self.norm_context.get_raw_log_features(company)
+            # Get bounded normalized features [0,1]
+            bounded_features = self.norm_context.apply_bounded(company)
             
-            # Extract revenue estimate (already log-transformed)
-            revenue_log = raw_log_features.get('budget_revenue_est_usd_log', 0.0)
+            # Extract revenue feature (bounded normalized to [0,1])
+            revenue_normalized = bounded_features.get('budget_revenue_est_usd_log', 0.0)
             
-            # Calculate Budget score: log10(revenue)/7
-            budget_score = revenue_log / 7.0
+            # Budget score is directly the normalized value (already in [0,1])
+            budget_score = revenue_normalized
             
             inputs_used = {
                 'revenue_raw_usd': company.budget.revenue_est_usd,
-                'revenue_log': revenue_log,
-                'formula': 'log10(revenue)/7'
+                'revenue_normalized': revenue_normalized,
+                'formula': 'bounded_normalized(log10(revenue))'
             }
             
             # Add warnings based on revenue

@@ -41,7 +41,7 @@ def create_app() -> FastAPI:
         Provides deterministic scoring based on Digital, Operations, Information Flow, 
         Market, and Budget dimensions with integrated risk assessment and feasibility gates.
         """,
-        version="1.0.0",
+        version="1.1.0",
         lifespan=lifespan
     )
 

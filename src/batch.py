@@ -12,7 +12,10 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Iterator, Tuple
 import time
 
-from .schema import CompanySchema, ScoringPayloadV2, RiskAssessment, FeasibilityGates
+from .schema import (
+    CompanySchema, ScoringPayloadV2, RiskAssessment, FeasibilityGates, ResponseMetadata,
+    VerboseSubscoreDetails, VerboseRiskDetails, VerboseFeasibilityDetails
+)
 from .normalization import NormContext
 from .scoring import SubscoreCalculator, FinalScorer
 from .risk_feasibility import RiskFeasibilityProcessor
@@ -154,7 +157,8 @@ class BatchProcessor:
     
     def score_single_company(self, company: CompanySchema, 
                            norm_context: NormContext, 
-                           deterministic: bool = False) -> ScoringPayloadV2:
+                           deterministic: bool = False,
+                           verbose: bool = False) -> ScoringPayloadV2:
         """
         Score a single company with complete Phase 4 assessment.
         
@@ -186,18 +190,101 @@ class BatchProcessor:
         else:
             timestamp = datetime.now(timezone.utc)
         
+        # Calculate confidence semantics
+        data_source_confidence = company.meta.source_confidence
+        model_confidence = phase3_result['confidence']
+        # Combined confidence is geometric mean to penalize low confidence in either area
+        combined_confidence = (data_source_confidence * model_confidence) ** 0.5
+        
+        # Create structured version metadata  
+        metadata = ResponseMetadata(
+            version={
+                "api": "1.1.0",
+                "engine": "1.1.0", 
+                "weights": "1.0"
+            },
+            timestamp=timestamp,
+            processing_time_ms=processing_time_ms
+        )
+        
+        # Build base subscores dict for backward compatibility
+        base_subscores = {}
+        for name, subscore_data in phase3_result['subscores'].items():
+            base_subscores[name] = {
+                'score': subscore_data['value'] * 100,  # Convert to 0-100 scale for display
+                'confidence': model_confidence  # Use overall model confidence
+            }
+        
+        # Initialize verbose fields
+        verbose_subscores = None
+        verbose_risk = None
+        verbose_feasibility = None
+        
+        if verbose:
+            # Create verbose subscore details
+            verbose_subscores = {}
+            # Get weights from final scorer
+            weights = self.final_scorer.weights
+            for name, subscore_data in phase3_result['subscores'].items():
+                weight = weights.get(name, 0.0)
+                verbose_subscores[name] = VerboseSubscoreDetails(
+                    inputs_used=subscore_data['inputs_used'],
+                    weighted_contribution=subscore_data['weighted_contribution'],
+                    internal_metrics={
+                        'raw_value': subscore_data['value'],
+                        'normalized_score': subscore_data['value'],
+                        'display_score': subscore_data['value'] * 100,
+                        'weight': weight
+                    },
+                    calculation_method=f"Weighted calculation using inputs: {', '.join(subscore_data['inputs_used'].keys()) if subscore_data['inputs_used'] else 'standard'}"
+                )
+            
+            # Create verbose risk details
+            verbose_risk = VerboseRiskDetails(
+                threshold_details={
+                    'confidence_threshold': 0.7,  # From risk_feasibility.py
+                    'volatility_high_threshold': 0.3,
+                    'missing_field_penalty_threshold': 0.2
+                },
+                calculation_breakdown={
+                    'data_confidence_source': 'company.meta.source_confidence',
+                    'missing_fields_detected': risk_feasibility_result['risk'].get('missing_field_penalty', 0) > 0,
+                    'volatility_factors': ['scrape_age', 'source_reliability'],
+                    'risk_calculation_method': 'threshold-based with weighted factors'
+                }
+            )
+            
+            # Create verbose feasibility details
+            verbose_feasibility = VerboseFeasibilityDetails(
+                gate_thresholds={
+                    'docs_threshold': 50,  # daily docs minimum
+                    'budget_floor_usd': 500000,  # minimum revenue
+                    'crm_ecom_required': True
+                },
+                evaluation_steps=[
+                    {'gate': 'docs_present', 'threshold': 50, 'value': company.info_flow.daily_docs_est, 'passed': risk_feasibility_result['feasibility']['docs_present']},
+                    {'gate': 'crm_or_ecom_present', 'requirement': 'at_least_one', 'crm': company.digital.crm_flag, 'ecom': company.digital.ecom_flag, 'passed': risk_feasibility_result['feasibility']['crm_or_ecom_present']},
+                    {'gate': 'budget_above_floor', 'threshold': 500000, 'value': company.budget.revenue_est_usd, 'passed': risk_feasibility_result['feasibility']['budget_above_floor']},
+                    {'gate': 'deployable_now', 'logic': 'all_gates_AND_low_risk', 'passed': risk_feasibility_result['feasibility']['deployable_now']}
+                ]
+            )
+        
         # Construct Phase 4 scoring payload
         scoring_payload = ScoringPayloadV2(
             final_score=phase3_result['final_score'],
-            confidence=phase3_result['confidence'],
-            subscores=phase3_result['subscores'],
+            model_confidence=model_confidence,
+            data_source_confidence=data_source_confidence,
+            combined_confidence=combined_confidence,
+            subscores=base_subscores,
             explanation=phase3_result['explanation'],
             warnings=phase3_result.get('warnings', []),
             risk=RiskAssessment(**risk_feasibility_result['risk']),
             feasibility=FeasibilityGates(**risk_feasibility_result['feasibility']),
             company_id=company.company_id,
-            timestamp=timestamp,
-            processing_time_ms=processing_time_ms
+            metadata=metadata,
+            verbose_subscores=verbose_subscores,
+            verbose_risk=verbose_risk,
+            verbose_feasibility=verbose_feasibility
         )
         
         return scoring_payload
@@ -273,7 +360,7 @@ class BatchProcessor:
                             company = CompanySchema(**company_data)
                             
                             # Score company
-                            scoring_payload = self.score_single_company(company, norm_context, deterministic)
+                            scoring_payload = self.score_single_company(company, norm_context, deterministic, verbose=False)
                             
                             # Write to output file
                             outfile.write(json.dumps(scoring_payload.model_dump(mode='json'), separators=(',', ':'), default=str) + '\n')

@@ -198,18 +198,23 @@ class TestBatchProcessor:
         
         # Validate result structure
         assert hasattr(scoring_result, 'final_score')
-        assert hasattr(scoring_result, 'confidence')
+        assert hasattr(scoring_result, 'model_confidence')
+        assert hasattr(scoring_result, 'data_source_confidence')
+        assert hasattr(scoring_result, 'combined_confidence')
         assert hasattr(scoring_result, 'risk')
         assert hasattr(scoring_result, 'feasibility')
         assert hasattr(scoring_result, 'company_id')
-        assert hasattr(scoring_result, 'timestamp')
-        assert hasattr(scoring_result, 'processing_time_ms')
+        assert hasattr(scoring_result, 'metadata')
+        assert hasattr(scoring_result.metadata, 'timestamp')
+        assert hasattr(scoring_result.metadata, 'processing_time_ms')
         
         # Validate values
         assert 0 <= scoring_result.final_score <= 100
-        assert 0 <= scoring_result.confidence <= 1
+        assert 0 <= scoring_result.model_confidence <= 1
+        assert 0 <= scoring_result.data_source_confidence <= 1
+        assert 0 <= scoring_result.combined_confidence <= 1
         assert scoring_result.company_id == "test_company_0"
-        assert scoring_result.processing_time_ms > 0
+        assert scoring_result.metadata.processing_time_ms > 0
     
     def test_process_batch_file_success(self, batch_processor, sample_companies):
         """Test successful batch file processing"""

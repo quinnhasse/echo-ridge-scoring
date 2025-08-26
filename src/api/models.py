@@ -20,6 +20,10 @@ class BatchScoreRequest(BaseModel):
         default=False, 
         description="Include additional debug information in responses"
     )
+    verbose: bool = Field(
+        default=False,
+        description="Include detailed internal scoring metrics and calculations"
+    )
 
 
 class BatchScoreResponse(BaseModel):

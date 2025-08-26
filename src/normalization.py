@@ -25,6 +25,50 @@ def flag_to_float(flag: bool) -> float:
     return 1.0 if flag else 0.0
 
 
+def bounded_zscore_to_unit_range(value: float, mean: float, std: float, sigma_bound: float = 3.0) -> float:
+    """
+    Bounded z-score normalization to [0,1] range using sigmoid mapping.
+    
+    This function:
+    1. Calculates z-score: (value - mean) / std
+    2. Clips z-score to [-sigma_bound, +sigma_bound] for outlier handling
+    3. Maps bounded z-score to [0,1] using sigmoid: 1 / (1 + exp(-z))
+    
+    Args:
+        value: Raw input value to normalize
+        mean: Mean of the reference distribution
+        std: Standard deviation of the reference distribution  
+        sigma_bound: Number of standard deviations for clipping (default: 3.0)
+    
+    Returns:
+        float: Normalized value in [0,1] range
+        
+    Reason: Bounded normalization ensures all values are in [0,1] for consistent
+    subscore calculations and prevents extreme outliers from dominating scores.
+    """
+    # Handle NaN inputs
+    if math.isnan(value) or math.isnan(mean) or math.isnan(std):
+        return float('nan')
+    
+    if std == 0:
+        return 0.5  # Reason: When std=0, all values are identical, return neutral 0.5
+    
+    # Calculate z-score
+    z_score = (value - mean) / std
+    
+    # Handle infinite z-scores
+    if math.isinf(z_score):
+        z_score = sigma_bound if z_score > 0 else -sigma_bound
+    
+    # Clip to bounds for consistent outlier handling
+    z_bounded = max(-sigma_bound, min(sigma_bound, z_score))
+    
+    # Map to [0,1] using sigmoid function: 1 / (1 + exp(-z))
+    normalized = 1.0 / (1.0 + math.exp(-z_bounded))
+    
+    return normalized
+
+
 class NormContext:
     """Stores normalization parameters (mean/std) for reproducible scoring"""
     
@@ -88,6 +132,43 @@ class NormContext:
             normalized_features[feature_name] = zscore(value, stats['mean'], stats['std'])
         
         return normalized_features
+    
+    def apply_bounded(self, company: CompanySchema) -> Dict[str, float]:
+        """
+        Normalize a single company record using bounded z-score to [0,1] range.
+        
+        This method applies bounded z-score normalization with sigmoid mapping
+        to ensure all output values are in [0,1] range for consistent subscore calculations.
+        
+        Args:
+            company: Company data to normalize
+            
+        Returns:
+            Dict[str, float]: Features normalized to [0,1] range
+            
+        Reason: Bounded normalization prevents negative subscore values and ensures
+        consistent [0,1] range for weighted contribution calculations.
+        """
+        if not self._fitted:
+            raise ValueError("NormContext must be fitted before applying normalization")
+        
+        # Check confidence threshold
+        if company.meta.source_confidence < self.confidence_threshold:
+            # Return zero features for low-confidence data
+            return {name: 0.0 for name in self.stats.keys()}
+        
+        # Extract raw (transformed) features
+        raw_features = self._extract_raw_features(company)
+        
+        # Apply bounded z-score normalization to [0,1]
+        bounded_features = {}
+        for feature_name, value in raw_features.items():
+            stats = self.stats[feature_name]
+            bounded_features[feature_name] = bounded_zscore_to_unit_range(
+                value, stats['mean'], stats['std']
+            )
+        
+        return bounded_features
     
     def get_raw_log_features(self, company: CompanySchema) -> Dict[str, float]:
         """Get raw log-transformed features for scoring (without z-score normalization)"""

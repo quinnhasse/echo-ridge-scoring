@@ -8,8 +8,6 @@ filtering to enable downstream agent triage and decision-making.
 from typing import Dict, List, Any, Tuple
 from datetime import datetime
 from .schema import CompanySchema
-from .normalization import NormContext
-
 
 class RiskAssessmentCalculator:
     """
@@ -76,6 +74,9 @@ class RiskAssessmentCalculator:
         """
         Calculate penalty for missing or zero-value fields.
         
+        Note: Boolean fields (crm_flag, ecom_flag) are never considered "missing" since
+        Pydantic requires them to be either True or False. False is a valid value, not missing.
+        
         Args:
             company: Company schema to analyze
             
@@ -85,13 +86,10 @@ class RiskAssessmentCalculator:
         missing_fields = []
         reasons = []
         
-        # Check digital fields
+        # Check digital fields - only non-boolean fields can be "missing"
         if company.digital.pagespeed <= 0:
             missing_fields.append('pagespeed')
-        if not company.digital.crm_flag:
-            missing_fields.append('crm_flag')
-        if not company.digital.ecom_flag:
-            missing_fields.append('ecom_flag')
+        # Note: crm_flag and ecom_flag are boolean - False is valid, not missing
         
         # Check ops fields
         if company.ops.employees <= 0:
@@ -116,7 +114,8 @@ class RiskAssessmentCalculator:
             missing_fields.append('revenue_est_usd')
         
         # Calculate penalty (0.0 = no missing fields, 1.0 = all fields missing)
-        total_fields = 10  # Total number of key fields checked
+        # Note: total_fields reduced from 10 to 8 since boolean fields are never "missing"
+        total_fields = 8  # Total number of key fields checked (excluding boolean fields)
         penalty = len(missing_fields) / total_fields
         
         # Generate reason strings

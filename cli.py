@@ -78,7 +78,7 @@ def score(
         table.add_row("Successful", str(result["companies_succeeded"]))
         table.add_row("Failed", str(result["companies_failed"]))
         table.add_row("Success Rate", f"{result['success_rate_pct']:.1f}%")
-        table.add_row("Processing Time", f"{result['processing_time_ms']:.0f} ms")
+        table.add_row("Processing Time", f"{result['processing_time_s']:.0f} s")
         table.add_row("NormContext Version", result["norm_context_version"])
         
         if result.get("batch_id"):
@@ -231,7 +231,7 @@ def batch_status(
         panel = Panel(
             f"[bold]Batch ID:[/bold] {status['batch_id']}\n"
             f"[bold]Status:[/bold] Completed\n"
-            f"[bold]Processing Time:[/bold] {status['processing_time_ms']:.0f} ms\n"
+            f"[bold]Processing Time:[/bold] {status['processing_time_s']:.0f} s\n"
             f"[bold]Success Rate:[/bold] {status['success_rate']:.1%}",
             title="Batch Run Summary"
         )
