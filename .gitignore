@@ -171,8 +171,7 @@ poetry.toml
 pyrightconfig.json
 
 # Claude PRP setup
-examples/
 Context-Engineering-Intro/
 serena/
 PRPs/
-
+examples/
