@@ -44,6 +44,51 @@ This runbook provides operational guidance for the Echo Ridge AI-readiness scori
 - **Fast Burn**: > 10x normal rate (triggers immediate alert)  
 - **Slow Burn**: > 2x normal rate (triggers daily summary)
 
+## Hybrid Scoring Operations
+
+### Roman Integration Monitoring
+
+When integrated with Roman's agentic pipeline, monitor these additional metrics:
+
+**Adapter Performance**:
+- PlaceNorm → CompanySchema conversion time (target: < 10ms)
+- Warning rate per conversion (expect 60-80% due to missing quantitative data)
+- Failed conversions requiring manual intervention
+
+**Blending Quality**:
+- AI vs Deterministic score divergence rates by strategy
+- Divergence flag frequency (> 30% may indicate model drift)
+- Blending confidence distribution
+
+**Integration Health**:
+```bash
+# Check adapter warnings
+grep "WARNING.*adapter" /var/log/echo_ridge.log | tail -20
+
+# Monitor divergence patterns  
+grep "divergence.*threshold" /var/log/echo_ridge.log | wc -l
+
+# Validate deterministic consistency
+echo_ridge_cli validate --input sample_roman_data.jsonl
+```
+
+**Alert Thresholds**:
+- Adapter failure rate > 5%: CRITICAL
+- Divergence flags > 50%: WARNING  
+- Blending time > 50ms: WARNING
+
+### Hybrid Score Interpretation
+
+**Divergence Analysis**:
+- `< 0.2`: Normal variation, no action needed
+- `0.2 - 0.4`: Monitor trend, may indicate data quality issues  
+- `> 0.4`: Significant divergence, investigate model assumptions
+
+**Warning Categories**:
+- Missing quantitative data (expected for Roman integration)
+- Low confidence extraction (< 0.6) 
+- Estimation fallbacks used
+
 ## Architecture Overview
 
 ```
