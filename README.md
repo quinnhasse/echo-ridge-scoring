@@ -255,30 +255,40 @@ for result in results:
 
 For operations, troubleshooting, SLOs, and rollback procedures, see **[docs/runbook.md](docs/runbook.md)**.
 
-## Repository Structure
+## Integrating with Roman's Pipeline
 
+Echo Ridge can be easily integrated with Roman's agentic search backend for hybrid AI + deterministic scoring:
+
+```python
+import echo_ridge_scoring as ers
+
+# Convert Roman's PlaceNorm data to Echo Ridge format
+company, warnings = ers.to_company_schema(roman_place_record)
+
+# Score with Echo Ridge deterministic engine  
+det_result = ers.score_company(company)
+
+# Blend with Roman's AI scores
+blended = ers.blend_scores(
+    ai_score=roman_ai_score,
+    det_score=det_result,
+    strategy="weighted_average",  # or "max_confidence", "consensus"
+    ai_weight=0.5,  # 50/50 blend
+    divergence_threshold=0.3
+)
+
+print(f"Blended score: {blended['blended_score']['overall_score']:.2f}")
+print(f"Divergence flags: {blended['divergence']['flags']}")
 ```
-echo-ridge-scoring/
-├── README.md                    # This file
-├── cli.py                      # Typer CLI for batch operations
-├── pyproject.toml              # Poetry configuration
-├── weights.yaml                # Frozen model weights v1.0
-├── src/                        # Main package
-│   ├── schema.py              # Pydantic data models
-│   ├── scoring.py             # Core scoring engine
-│   ├── normalization.py       # Statistical normalization
-│   ├── risk_feasibility.py    # Risk assessment
-│   ├── batch.py              # Batch processing
-│   ├── persistence.py        # Database & storage
-│   ├── calibration.py        # Model calibration
-│   ├── drift.py             # Drift monitoring
-│   ├── monitoring.py        # Observability
-│   ├── sdk.py               # Client SDK
-│   └── api/                 # REST API
-├── tests/                   # Test suite (88 tests)
-├── docs/                   # Documentation
-└── example_usage.py        # Direct library usage example
-```
+
+**Adapter Mapping**: Roman's `PlaceNorm` → Echo Ridge `CompanySchema` using observed values only. Missing quantitative data triggers explicit warnings per our deterministic policy.
+
+**Blending Strategies**:
+- `weighted_average`: Configurable AI/deterministic weight (default 50/50)
+- `max_confidence`: Select highest confidence score per component  
+- `consensus`: Average when close, flag when divergent
+
+## Repository Structure
 
 ---
 
