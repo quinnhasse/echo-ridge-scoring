@@ -14,7 +14,7 @@ import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
-from schema import (
+from ..schema import (
     CompanySchema, DigitalSchema, OpsSchema, InfoFlowSchema, 
     MarketSchema, BudgetSchema, MetaSchema
 )
@@ -41,9 +41,9 @@ def to_company_schema(roman_record: Dict[str, Any]) -> Tuple[CompanySchema, List
     
     # Required field mapping (observed values only)
     try:
-        company_id = str(place_data['entity_id'])
+        company_id = str(place_data['entity_id']) or place_data.get("source_id")
     except KeyError:
-        raise ValueError("Missing required field: entity_id")
+        raise ValueError("Missing required field: entity_id or source_id")
     
     # Domain extraction with fallback
     domain = _extract_domain(place_data, warnings)
