@@ -4,9 +4,9 @@ FastAPI dependencies for the Echo Ridge scoring service.
 
 from fastapi import HTTPException, status
 
-from ..batch import BatchProcessor
-from ..normalization import NormContext
-from ..persistence import PersistenceManager
+from ..echo_ridge_scoring.batch import BatchProcessor
+from ..echo_ridge_scoring.normalization import NormContext
+from ..echo_ridge_scoring.persistence import PersistenceManager
 
 
 # Global persistence manager instance

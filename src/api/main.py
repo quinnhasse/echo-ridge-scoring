@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from .dependencies import set_persistence_manager
-from ..persistence import PersistenceManager
+from ..echo_ridge_scoring.persistence import PersistenceManager
 
 
 @asynccontextmanager

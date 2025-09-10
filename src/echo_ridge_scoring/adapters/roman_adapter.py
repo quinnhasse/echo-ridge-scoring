@@ -40,10 +40,16 @@ def to_company_schema(roman_record: Dict[str, Any]) -> Tuple[CompanySchema, List
     web_snapshot = roman_record.get('web_snapshot')
     
     # Required field mapping (observed values only)
-    try:
-        company_id = str(place_data['entity_id']) or place_data.get("source_id")
-    except KeyError:
-        raise ValueError("Missing required field: entity_id or source_id")
+    # company_id: accept several real-world keys; otherwise fail clearly
+    company_id = (
+        (place_data.get("entity_id")
+        or place_data.get("source_id")
+        or place_data.get("place_id")
+        or place_data.get("id"))
+    )
+    if not company_id:
+        raise ValueError("Missing required field: entity_id or source_id (or place_id/id)")
+    company_id = str(company_id)
     
     # Domain extraction with fallback
     domain = _extract_domain(place_data, warnings)

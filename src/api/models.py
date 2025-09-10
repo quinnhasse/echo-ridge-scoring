@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 
-from ..schema import CompanySchema, ScoringPayloadV2
+from ..echo_ridge_scoring.schema import CompanySchema, ScoringPayloadV2
 
 
 class BatchScoreRequest(BaseModel):

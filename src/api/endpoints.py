@@ -17,10 +17,10 @@ from .models import (
     HealthResponse,
     StatsResponse
 )
-from ..schema import CompanySchema, ScoringPayloadV2, ResponseMetadata, RiskAssessment, FeasibilityGates
-from ..batch import BatchProcessor
-from ..persistence import PersistenceManager
-from ..normalization import NormContext
+from ..echo_ridge_scoring.schema import CompanySchema, ScoringPayloadV2, ResponseMetadata, RiskAssessment, FeasibilityGates
+from ..echo_ridge_scoring.batch import BatchProcessor
+from ..echo_ridge_scoring.persistence import PersistenceManager
+from ..echo_ridge_scoring.normalization import NormContext
 
 router = APIRouter()
 
