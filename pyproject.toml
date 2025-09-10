@@ -4,7 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["quinnhasse <quinn.hasse@gmail.com>"]
 packages = [
-  { include = "src" }
+  { include = "echo_ridge_scoring", from = "src" }
 ]
 
 [tool.poetry.dependencies]
