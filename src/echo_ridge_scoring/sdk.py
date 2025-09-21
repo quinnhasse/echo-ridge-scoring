@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union, AsyncGenerator
 from urllib.parse import urljoin
+from fastapi.encoders import jsonable_encoder
 
 import httpx
 from pydantic import BaseModel, Field, validator
@@ -179,6 +180,7 @@ class ScoringClient:
         # Make API request with retries
         for attempt in range(self.config.max_retries):
             try:
+                request_data = jsonable_encoder(company)   # or whatever variable holds the body
                 response = self.client.post("/score", json=request_data)
                 
                 if response.status_code == 200:
