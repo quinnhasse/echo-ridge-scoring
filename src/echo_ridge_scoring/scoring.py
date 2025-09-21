@@ -1,7 +1,8 @@
 from typing import Dict, List, Any
 from .schema import CompanySchema
 from .normalization import NormContext
-
+import os
+MASK_ON_INFEASIBLE = os.getenv("ECHO_RIDGE_MASK_ON_INFEASIBLE", "true").lower() == "true"
 
 class SubscoreCalculator:
     """Calculates individual sub-scores (D/O/I/M/B) from normalized company features"""
@@ -15,19 +16,14 @@ class SubscoreCalculator:
         inputs_used = {}
         
         try:
-            # Check confidence threshold
-            if company.meta.source_confidence < self.norm_context.confidence_threshold:
-                warnings.append("LOW_CONFIDENCE: Company data below confidence threshold")
-                return {
-                    "value": 0.0,
-                    "inputs_used": {"confidence": company.meta.source_confidence},
-                    "warnings": warnings
-                }
+            # Add confidence warning if below original threshold
+            if company.meta.source_confidence < 0.7:
+                warnings.append(f"LOW_CONFIDENCE: Company data confidence {company.meta.source_confidence:.2f} below optimal threshold")
             
-            # Get bounded normalized features [0,1]
+            # Get bounded normalized features [0,1] (now with confidence scaling applied)
             bounded_features = self.norm_context.apply_bounded(company)
             
-            # Extract required features (all in [0,1] range)
+            # Extract required features (all in [0,1] range, confidence-scaled)
             pagespeed = bounded_features.get('digital_pagespeed', 0.0)
             crm_flag = bounded_features.get('digital_crm_flag', 0.0) 
             ecom_flag = bounded_features.get('digital_ecom_flag', 0.0)
@@ -39,7 +35,8 @@ class SubscoreCalculator:
                 'pagespeed_normalized': pagespeed,
                 'crm_flag_normalized': crm_flag,
                 'ecom_flag_normalized': ecom_flag,
-                'weights': {'pagespeed': 0.4, 'crm': 0.3, 'ecom': 0.3}
+                'weights': {'pagespeed': 0.4, 'crm': 0.3, 'ecom': 0.3},
+                'confidence_scale': company.meta.source_confidence
             }
             
             # Add warnings for extreme values
@@ -66,19 +63,14 @@ class SubscoreCalculator:
         inputs_used = {}
         
         try:
-            # Check confidence threshold
-            if company.meta.source_confidence < self.norm_context.confidence_threshold:
-                warnings.append("LOW_CONFIDENCE: Company data below confidence threshold")
-                return {
-                    "value": 0.0,
-                    "inputs_used": {"confidence": company.meta.source_confidence},
-                    "warnings": warnings
-                }
+            # Add confidence warning if below original threshold
+            if company.meta.source_confidence < 0.7:
+                warnings.append(f"LOW_CONFIDENCE: Company data confidence {company.meta.source_confidence:.2f} below optimal threshold")
             
-            # Get bounded normalized features [0,1]
+            # Get bounded normalized features [0,1] (now with confidence scaling applied)
             bounded_features = self.norm_context.apply_bounded(company)
             
-            # Extract required features (all in [0,1] range)
+            # Extract required features (all in [0,1] range, confidence-scaled)
             employees = bounded_features.get('ops_employees_log', 0.0)
             locations = bounded_features.get('ops_locations_log', 0.0)
             services = bounded_features.get('ops_services_count_log', 0.0)
@@ -91,7 +83,8 @@ class SubscoreCalculator:
                 'employees_normalized': employees,
                 'locations_normalized': locations,
                 'services_normalized': services,
-                'formula': '(employees + locations + services) / 3'
+                'formula': '(employees + locations + services) / 3',
+                'confidence_scale': company.meta.source_confidence
             }
             
             # Add warnings for extreme values in [0,1] range
@@ -120,16 +113,11 @@ class SubscoreCalculator:
         inputs_used = {}
         
         try:
-            # Check confidence threshold
-            if company.meta.source_confidence < self.norm_context.confidence_threshold:
-                warnings.append("LOW_CONFIDENCE: Company data below confidence threshold")
-                return {
-                    "value": 0.0,
-                    "inputs_used": {"confidence": company.meta.source_confidence},
-                    "warnings": warnings
-                }
+            # Add confidence warning if below original threshold
+            if company.meta.source_confidence < 0.7:
+                warnings.append(f"LOW_CONFIDENCE: Company data confidence {company.meta.source_confidence:.2f} below optimal threshold")
             
-            # Get bounded normalized features [0,1]
+            # Get bounded normalized features [0,1] (now with confidence scaling applied)
             bounded_features = self.norm_context.apply_bounded(company)
             
             # Extract daily docs feature (bounded normalized to [0,1])
@@ -141,7 +129,8 @@ class SubscoreCalculator:
             inputs_used = {
                 'daily_docs_raw': company.info_flow.daily_docs_est,
                 'daily_docs_normalized': docs_normalized,
-                'formula': 'bounded_normalized(log10(docs + 1))'
+                'formula': 'bounded_normalized(log10(docs + 1))',
+                'confidence_scale': company.meta.source_confidence
             }
             
             # Add warnings
@@ -170,19 +159,14 @@ class SubscoreCalculator:
         inputs_used = {}
         
         try:
-            # Check confidence threshold
-            if company.meta.source_confidence < self.norm_context.confidence_threshold:
-                warnings.append("LOW_CONFIDENCE: Company data below confidence threshold")
-                return {
-                    "value": 0.0,
-                    "inputs_used": {"confidence": company.meta.source_confidence},
-                    "warnings": warnings
-                }
+            # Add confidence warning if below original threshold
+            if company.meta.source_confidence < 0.7:
+                warnings.append(f"LOW_CONFIDENCE: Company data confidence {company.meta.source_confidence:.2f} below optimal threshold")
             
-            # Get bounded normalized features [0,1]
+            # Get bounded normalized features [0,1] (now with confidence scaling applied)
             bounded_features = self.norm_context.apply_bounded(company)
             
-            # Extract required features (all in [0,1] range)
+            # Extract required features (all in [0,1] range, confidence-scaled)
             comp_density = bounded_features.get('market_competitor_density_log', 0.0)
             industry_growth = bounded_features.get('market_industry_growth_pct', 0.0)
             rivalry = bounded_features.get('market_rivalry_index', 0.0)
@@ -195,7 +179,8 @@ class SubscoreCalculator:
                 'competitor_density_normalized': comp_density,
                 'industry_growth_normalized': industry_growth,
                 'rivalry_index_normalized': rivalry,
-                'formula': '(comp_density + industry_growth + (1-rivalry)) / 3'
+                'formula': '(comp_density + industry_growth + (1-rivalry)) / 3',
+                'confidence_scale': company.meta.source_confidence
             }
             
             # Add contextual warnings for [0,1] normalized values
@@ -227,16 +212,11 @@ class SubscoreCalculator:
         inputs_used = {}
         
         try:
-            # Check confidence threshold
-            if company.meta.source_confidence < self.norm_context.confidence_threshold:
-                warnings.append("LOW_CONFIDENCE: Company data below confidence threshold")
-                return {
-                    "value": 0.0,
-                    "inputs_used": {"confidence": company.meta.source_confidence},
-                    "warnings": warnings
-                }
+            # Add confidence warning if below original threshold
+            if company.meta.source_confidence < 0.7:
+                warnings.append(f"LOW_CONFIDENCE: Company data confidence {company.meta.source_confidence:.2f} below optimal threshold")
             
-            # Get bounded normalized features [0,1]
+            # Get bounded normalized features [0,1] (now with confidence scaling applied)
             bounded_features = self.norm_context.apply_bounded(company)
             
             # Extract revenue feature (bounded normalized to [0,1])
@@ -248,7 +228,8 @@ class SubscoreCalculator:
             inputs_used = {
                 'revenue_raw_usd': company.budget.revenue_est_usd,
                 'revenue_normalized': revenue_normalized,
-                'formula': 'bounded_normalized(log10(revenue))'
+                'formula': 'bounded_normalized(log10(revenue))',
+                'confidence_scale': company.meta.source_confidence
             }
             
             # Add warnings based on revenue

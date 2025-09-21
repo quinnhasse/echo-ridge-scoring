@@ -72,7 +72,7 @@ def bounded_zscore_to_unit_range(value: float, mean: float, std: float, sigma_bo
 class NormContext:
     """Stores normalization parameters (mean/std) for reproducible scoring"""
     
-    def __init__(self, confidence_threshold: float = 0.7):
+    def __init__(self, confidence_threshold: float = 0.5):
         self.confidence_threshold = confidence_threshold
         self.stats: Dict[str, Dict[str, float]] = {}
         self._fitted = False
@@ -152,11 +152,6 @@ class NormContext:
         if not self._fitted:
             raise ValueError("NormContext must be fitted before applying normalization")
         
-        # Check confidence threshold
-        if company.meta.source_confidence < self.confidence_threshold:
-            # Return zero features for low-confidence data
-            return {name: 0.0 for name in self.stats.keys()}
-        
         # Extract raw (transformed) features
         raw_features = self._extract_raw_features(company)
         
@@ -164,9 +159,14 @@ class NormContext:
         bounded_features = {}
         for feature_name, value in raw_features.items():
             stats = self.stats[feature_name]
-            bounded_features[feature_name] = bounded_zscore_to_unit_range(
+            normalized_value = bounded_zscore_to_unit_range(
                 value, stats['mean'], stats['std']
             )
+            
+            # Apply confidence scaling instead of hard cutoff
+            # Reason: Scale down scores based on confidence but don't zero them out
+            confidence_scale = max(0.1, company.meta.source_confidence)  # Minimum 10% confidence
+            bounded_features[feature_name] = normalized_value * confidence_scale
         
         return bounded_features
     
