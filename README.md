@@ -1,297 +1,273 @@
-# Echo Ridge Scoring Engine – Production-Ready AI-Readiness Assessment
+# Echo Ridge Scoring Package
 
-A deterministic scoring system that evaluates companies based on their AI-readiness using a five-part subscore model (D/O/I/M/B). This production-ready framework provides comprehensive scoring, risk assessment, batch processing, REST API, and drift monitoring for systematic evaluation of business entities.
+Deterministic DOIMB scoring (0–100) + risk/feasibility assessment designed to plug into Roman's agentic pipeline as a **parallel** scorer to AI/DIMB analysis.
 
-## Overview
+The system provides a two-stage architecture: Roman's agentic discovery produces rich contextual data, while Echo Ridge deterministic scoring provides mathematical precision. Scores blend using configurable strategies to combine contextual intelligence with quantitative analysis.
 
-Echo Ridge Scoring provides a complete, production-ready framework for evaluating company AI-readiness through multi-dimensional analysis. The system processes structured company data across five key domains—Digital Maturity, Operational Complexity, Information Flow, Market Pressure, and Budget Signals—to generate deterministic scores with full explainability, confidence metrics, and risk assessment.
+## Quick Start
 
-**Current Status: Phases 4-10 Complete** – Production-ready with REST API, batch processing, drift monitoring, calibration, and comprehensive observability.
+### Prerequisites
+- Python 3.11+
+- Poetry (for dependency management)
+- Roman's repo at `examples/echoridge_search_backend/` (reference only)
 
-## Collaborators
-
-* **Quinn Hasse** (UW Madison)
-
-## Scoring Model (D/O/I/M/B)
-
-| Component | Full Name | Description | Weight |
-|-----------|-----------|-------------|---------|
-| **D** | Digital Maturity | Page speed, CRM adoption, e-commerce capabilities | 25% |
-| **O** | Operational Complexity | Employee count, location diversity, service portfolio size | 20% |
-| **I** | Information Flow | Daily document volume and data processing capacity | 20% |
-| **M** | Market Pressure | Competitive density, industry growth, rivalry intensity | 20% |
-| **B** | Budget Signals | Revenue estimates and financial capacity indicators | 15% |
-
-## Quickstart
-
-### 1. Setup Environment
+### Install
 ```bash
-# Clone and install
-git clone <repository-url>
-cd echo-ridge-scoring
-poetry install && poetry shell
+# Development install
+poetry install
+
+# Or build and install wheel
+poetry build && python -m pip install --force-reinstall dist/echo_ridge_scoring-*.whl
 ```
 
-### 2. Batch Processing (CLI)
+### Run API
 ```bash
-# Score companies from JSONL file
-echo '{"company_id":"demo","domain":"demo.com","digital":{"pagespeed":85,"crm_flag":true,"ecom_flag":false},"ops":{"employees":25,"locations":2,"services_count":5},"info_flow":{"daily_docs_est":150},"market":{"competitor_density":8,"industry_growth_pct":3.5,"rivalry_index":0.7},"budget":{"revenue_est_usd":1500000},"meta":{"scrape_ts":"2025-08-25T10:00:00Z","source_confidence":0.85}}' > companies.jsonl
-
-poetry run python cli.py score --input companies.jsonl --output scores.jsonl
-
-# Validate deterministic behavior
-poetry run python cli.py validate --input companies.jsonl
-```
-
-### 3. REST API
-```bash
-# Start API server
+# Standard mode (infeasible companies get masked/zeroed scores)
 poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 
-# Test single company scoring
-curl -X POST "http://127.0.0.1:8000/score" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "company_id": "test-001",
-    "domain": "test.com",
-    "digital": {"pagespeed": 85, "crm_flag": true, "ecom_flag": false},
-    "ops": {"employees": 25, "locations": 2, "services_count": 5},
-    "info_flow": {"daily_docs_est": 150},
-    "market": {"competitor_density": 8, "industry_growth_pct": 3.5, "rivalry_index": 0.7},
-    "budget": {"revenue_est_usd": 1500000},
-    "meta": {"scrape_ts": "2025-08-25T10:00:00Z", "source_confidence": 0.85}
-  }'
-
-# View interactive API docs
-open http://127.0.0.1:8000/docs
+# Development mode (no masking - shows numeric scores even when infeasible)
+ECHO_RIDGE_MASK_ON_INFEASIBLE=false poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-### 4. Sample Response
-```json
-{
-  "final_score": 75.5,
-  "confidence": 0.85,
-  "subscores": {
-    "digital": {"score": 80.0, "confidence": 0.9},
-    "ops": {"score": 70.0, "confidence": 0.8}
-  },
-  "explanation": "Company demonstrates strong digital capabilities with good operational foundation.",
-  "risk": {
-    "overall_risk": "low",
-    "data_confidence": 0.85
-  },
-  "feasibility": {
-    "overall_feasible": true,
-    "deployable_now": true
-  },
-  "company_id": "test-001",
-  "processing_time_ms": 45.2
-}
-```
+## Minimal Integration (10 Lines)
 
-## Determinism
-
-Echo Ridge Scoring Engine is **auditably deterministic** – identical inputs produce identical outputs with matching checksums.
-
-### How Determinism Works
-- **NormContext Versioning**: Statistical parameters are versioned and frozen
-- **Reproducible Processing**: Same input + same NormContext = identical output
-- **Checksum Validation**: Content-based hashing ensures reproducibility
-- **No Wall-Clock Dependencies**: All timestamps normalized to input data
-
-### Validation Commands
-```bash
-# Validate same input produces identical outputs
-poetry run python cli.py validate --input test_data.jsonl
-
-# Check specific NormContext version
-poetry run python cli.py contexts
-
-# Verify batch reproducibility  
-poetry run python cli.py score --input data.jsonl --output run1.jsonl
-poetry run python cli.py score --input data.jsonl --output run2.jsonl
-diff run1.jsonl run2.jsonl  # Should show no differences
-```
-
-### Checksum Example
-```bash
-$ poetry run python cli.py validate --input demo.jsonl
-✓ Processing is deterministic and reproducible!
-First Run Checksum:  3d4eea7718ecf64a...
-Second Run Checksum: 3d4eea7718ecf64a...
-```
-
-## Drift Monitoring
-
-The system continuously monitors for data drift across input distributions, scoring patterns, and weight sensitivity to detect when recalibration may be needed.
-
-### What's Monitored
-- **Input Distribution Drift**: Changes in company data patterns (pagespeed, employees, etc.)
-- **Scoring Distribution Drift**: Shifts in output score distributions
-- **Null Rate Changes**: Increases in missing or invalid data
-- **Weight Sensitivity**: Model stability under weight perturbations
-
-### Drift Thresholds (Meaningful Change Detection)
-- **Distribution Shift**: 3.0σ for critical alerts (prevents noisy alerts)
-- **Null Rate Increase**: ≥10% increase triggers critical alert
-- **Scoring Drift**: Kolmogorov-Smirnov test p < 0.01 for critical
-- **Weight Sensitivity**: >10% correlation change triggers alert
-
-### Accessing Drift Reports
-```bash
-# Run comprehensive drift analysis
-poetry run python -c "
-from src.drift import DriftDetector
-detector = DriftDetector()
-results = detector.run_comprehensive_drift_analysis(baseline_data, current_data)
-print(f'Alerts: {len(results[\"drift_alerts\"])}')"
-
-# View drift detection logs
-tail -f echo_ridge_scoring.log | grep "drift"
-
-# Check service stats for drift indicators
-curl http://127.0.0.1:8000/stats
-```
-
-### Drift Alert Example
-```json
-{
-  "alert_id": "distribution_drift_digital.pagespeed_1640995200",
-  "drift_type": "INPUT_DISTRIBUTION", 
-  "severity": "CRITICAL",
-  "message": "Critical distribution shift in digital.pagespeed: mean changed by 3.5σ",
-  "affected_component": "digital.pagespeed",
-  "recommended_actions": [
-    "Review data collection process for changes",
-    "Consider recalibration if drift persists"
-  ]
-}
-```
-
-## SDK Usage
-
-The SDK provides type-safe, production-ready client libraries for downstream integration.
-
-### Basic Usage
-```python
-from src.sdk import create_client, score_company
-
-# Create client
-client = create_client(base_url="http://127.0.0.1:8000")
-
-# Score single company
-company_data = {
-    "company_id": "example-001",
-    "domain": "example.com",
-    "digital": {"pagespeed": 85, "crm_flag": True, "ecom_flag": False},
-    "ops": {"employees": 25, "locations": 2, "services_count": 5},
-    "info_flow": {"daily_docs_est": 150},
-    "market": {"competitor_density": 8, "industry_growth_pct": 3.5, "rivalry_index": 0.7},
-    "budget": {"revenue_est_usd": 1500000},
-    "meta": {"scrape_ts": "2025-08-25T10:00:00Z", "source_confidence": 0.85}
-}
-
-result = score_company(company_data, base_url="http://127.0.0.1:8000")
-print(f"AI Readiness Score: {result['final_score']:.1f}/100")
-```
-
-### Error Handling
-```python
-from src.sdk import ScoringError, ValidationError, APIError
-
-try:
-    result = score_company(invalid_company_data)
-except ValidationError as e:
-    print(f"Invalid data: {e}")
-except APIError as e:
-    print(f"API error: {e}")
-except ScoringError as e:
-    print(f"Scoring failed: {e}")
-```
-
-### Batch Processing
-```python
-from src.sdk import score_companies
-
-results = score_companies(
-    companies=[company1, company2, company3],
-    base_url="http://127.0.0.1:8000"
-)
-
-for result in results:
-    print(f"{result['company_id']}: {result['final_score']:.1f}")
-```
-
-## Production Features
-
-### ✅ Completed (Phases 4-10)
-- **Phase 4**: Risk assessment and feasibility gates
-- **Phase 5**: Batch processing with persistence and CLI
-- **Phase 6**: REST API with OpenAPI documentation
-- **Phase 7**: Model calibration and weight optimization  
-- **Phase 8**: Data drift detection and monitoring
-- **Phase 9**: Observability, logging, and health checks
-- **Phase 10**: SDK and downstream integration support
-
-### Architecture
-```
-├── src/
-│   ├── schema.py           # Pydantic models & validation
-│   ├── scoring.py          # Core D/O/I/M/B calculations
-│   ├── risk_feasibility.py # Risk assessment & gates
-│   ├── batch.py           # Batch processing engine
-│   ├── persistence.py     # Database models & storage
-│   ├── calibration.py     # Model calibration tools
-│   ├── drift.py          # Drift detection & monitoring
-│   ├── monitoring.py     # Observability & health checks
-│   ├── sdk.py            # Client SDK & helpers
-│   └── api/              # REST API endpoints
-├── cli.py                # Command-line interface
-├── tests/                # Comprehensive test suite (88 tests)
-└── docs/runbook.md       # Operations runbook
-```
-
-## Runbook
-
-For operations, troubleshooting, SLOs, and rollback procedures, see **[docs/runbook.md](docs/runbook.md)**.
-
-## Integrating with Roman's Pipeline
-
-Echo Ridge can be easily integrated with Roman's agentic search backend for hybrid AI + deterministic scoring:
+Drop this into Roman's scoring stage for immediate deterministic + blended scoring:
 
 ```python
 import echo_ridge_scoring as ers
+from fastapi.encoders import jsonable_encoder
 
-# Convert Roman's PlaceNorm data to Echo Ridge format
-company, warnings = ers.to_company_schema(roman_place_record)
+# Adapt Roman's data to Echo Ridge format
+company, warnings = ers.to_company_schema(roman_record_dict)
 
-# Score with Echo Ridge deterministic engine  
-det_result = ers.score_company(company)
+# Score via REST API (JSON-safe)
+company_json = jsonable_encoder(company)
+det_result = ers.score_company(company_json, base_url="http://127.0.0.1:8000")
 
-# Blend with Roman's AI scores
-blended = ers.blend_scores(
-    ai_score=roman_ai_score,
-    det_score=det_result,
-    strategy="weighted_average",  # or "max_confidence", "consensus"
-    ai_weight=0.5,  # 50/50 blend
-    divergence_threshold=0.3
-)
+# Blend with Roman's AI score  
+blended = ers.blend_scores(ai_score_dict, det_result, ai_weight=0.5)
 
-print(f"Blended score: {blended['blended_score']['overall_score']:.2f}")
-print(f"Divergence flags: {blended['divergence']['flags']}")
+# Output for scores/*.jsonl
+print(f"Deterministic: {det_result['final_score']}, Blended: {blended['blended_score']['overall_score']:.2f}")
 ```
 
-**Adapter Mapping**: Roman's `PlaceNorm` → Echo Ridge `CompanySchema` using observed values only. Missing quantitative data triggers explicit warnings per our deterministic policy.
+## Roman Adapter Notes
 
-**Blending Strategies**:
-- `weighted_average`: Configurable AI/deterministic weight (default 50/50)
-- `max_confidence`: Select highest confidence score per component  
-- `consensus`: Average when close, flag when divergent
+**Field Mapping:**
+- `entity_id` or `source_id` → `company_id` (required)
+- `metadata.domain` or `website` URL → `domain` (with fallback parsing)
+- `created_at` → `meta.scrape_ts` (ISO timestamp parsing)
+- `confidence_score` → `meta.source_confidence` (0.0-1.0)
 
-## Repository Structure
+**Content Analysis:**
+- WebSnapshot text → `digital.crm_flag` (detects "customer portal", "member login", "dashboard")
+- WebSnapshot text → `digital.ecom_flag` (detects "checkout", "purchase", "payment", "stripe")
+
+**Expected Warnings:** 9-10 warnings per conversion due to missing quantitative business metrics (normal behavior).
+
+**Determinism Policy:** No guessed business facts. Missing fields get explicit defaults with warnings. No hallucination.
+
+## Feasibility & Masking Behavior
+
+**Default Behavior (Masked):** Infeasible companies produce zeroed subscores to enforce strict triage.
+
+**Development Mode (Unmasked):** Shows numeric scores even when infeasible for debugging.
+
+```bash
+# Strict mode (production)
+poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+
+# Dev mode (see all scores)  
+ECHO_RIDGE_MASK_ON_INFEASIBLE=false poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+```
+
+**When to use each:**
+- **Masked:** Production triage where only viable companies should score high
+- **Unmasked:** Development debugging to see mathematical scoring regardless of feasibility
+
+## JSON-Safety Tips
+
+**Request Encoding:**
+```python
+from fastapi.encoders import jsonable_encoder
+
+# Before REST calls
+company_json = jsonable_encoder(company)  # Handles datetime → string
+result = ers.score_company(company_json, base_url="http://127.0.0.1:8000")
+```
+
+**Response Handling:**
+```python
+# SDK handles JSON encoding internally
+det_result = ers.score_company(company_dict, base_url="http://127.0.0.1:8000")
+
+# For blending, SDK normalizes payloads automatically
+blended = ers.blend_scores(ai_score_dict, det_result, ai_weight=0.5)
+```
+
+**SDK Internal Safety:** The SDK uses `jsonable_encoder` internally, so dict/Pydantic inputs work safely.
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| `ImportError: No module named echo_ridge_scoring` | Install wheel: `poetry build && pip install dist/echo_ridge_scoring-*.whl` |
+| `TypeError: Object of type datetime is not JSON serializable` | Use `jsonable_encoder(company)` before REST calls |
+| `AttributeError: 'ScoringPayloadV2' has no attribute 'get'` | Convert to dict: `det_result.model_dump(mode="json")` or use SDK functions |
+| All zeros `final_score` | Check feasibility gates; toggle masking with `ECHO_RIDGE_MASK_ON_INFEASIBLE=false`; ensure minimal viable fields |
+
+## API Endpoints
+
+- **POST /score** — Score single company
+- **POST /score/batch** — Score multiple companies  
+- **GET /healthz** — Health check
+- **GET /stats** — Service statistics and normalization context
+
+## Versioning & Config
+
+**Engine Version:** Surfaced in `payload.metadata.version.engine` (currently "1.1.0")
+
+**Weights:** Defined in `weights.yaml` with production-ready calibration:
+- Digital: 25%, Operations: 20%, Info Flow: 20%, Market: 20%, Budget: 15%
+
+**Masking Control:** `ECHO_RIDGE_MASK_ON_INFEASIBLE` environment variable (default: "true")
 
 ---
 
-## Research Use Notice
+**Status:** ✅ Production-ready for Roman's hybrid scoring pipeline# Echo Ridge Scoring Package
 
-This scoring framework is designed for business intelligence, investment analysis, and academic research into AI adoption patterns. The system provides deterministic, explainable assessments to support data-driven decision making in technology strategy and market analysis contexts.
+Deterministic DOIMB scoring (0–100) + risk/feasibility assessment designed to plug into Roman's agentic pipeline as a **parallel** scorer to AI/DIMB analysis.
+
+The system provides a two-stage architecture: Roman's agentic discovery produces rich contextual data, while Echo Ridge deterministic scoring provides mathematical precision. Scores blend using configurable strategies to combine contextual intelligence with quantitative analysis.
+
+## Quick Start
+
+### Prerequisites
+- Python 3.11+
+- Poetry (for dependency management)
+- Roman's repo at `examples/echoridge_search_backend/` (reference only)
+
+### Install
+```bash
+# Development install
+poetry install
+
+# Or build and install wheel
+poetry build && python -m pip install --force-reinstall dist/echo_ridge_scoring-*.whl
+```
+
+### Run API
+```bash
+# Standard mode (infeasible companies get masked/zeroed scores)
+poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+
+# Development mode (no masking - shows numeric scores even when infeasible)
+ECHO_RIDGE_MASK_ON_INFEASIBLE=false poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+```
+
+## Minimal Integration (10 Lines)
+
+Drop this into Roman's scoring stage for immediate deterministic + blended scoring:
+
+```python
+import echo_ridge_scoring as ers
+from fastapi.encoders import jsonable_encoder
+
+# Adapt Roman's data to Echo Ridge format
+company, warnings = ers.to_company_schema(roman_record_dict)
+
+# Score via REST API (JSON-safe)
+company_json = jsonable_encoder(company)
+det_result = ers.score_company(company_json, base_url="http://127.0.0.1:8000")
+
+# Blend with Roman's AI score  
+blended = ers.blend_scores(ai_score_dict, det_result, ai_weight=0.5)
+
+# Output for scores/*.jsonl
+print(f"Deterministic: {det_result['final_score']}, Blended: {blended['blended_score']['overall_score']:.2f}")
+```
+
+## Roman Adapter Notes
+
+**Field Mapping:**
+- `entity_id` or `source_id` → `company_id` (required)
+- `metadata.domain` or `website` URL → `domain` (with fallback parsing)
+- `created_at` → `meta.scrape_ts` (ISO timestamp parsing)
+- `confidence_score` → `meta.source_confidence` (0.0-1.0)
+
+**Content Analysis:**
+- WebSnapshot text → `digital.crm_flag` (detects "customer portal", "member login", "dashboard")
+- WebSnapshot text → `digital.ecom_flag` (detects "checkout", "purchase", "payment", "stripe")
+
+**Expected Warnings:** 9-10 warnings per conversion due to missing quantitative business metrics (normal behavior).
+
+**Determinism Policy:** No guessed business facts. Missing fields get explicit defaults with warnings. No hallucination.
+
+## Feasibility & Masking Behavior
+
+**Default Behavior (Masked):** Infeasible companies produce zeroed subscores to enforce strict triage.
+
+**Development Mode (Unmasked):** Shows numeric scores even when infeasible for debugging.
+
+```bash
+# Strict mode (production)
+poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+
+# Dev mode (see all scores)  
+ECHO_RIDGE_MASK_ON_INFEASIBLE=false poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+```
+
+**When to use each:**
+- **Masked:** Production triage where only viable companies should score high
+- **Unmasked:** Development debugging to see mathematical scoring regardless of feasibility
+
+## JSON-Safety Tips
+
+**Request Encoding:**
+```python
+from fastapi.encoders import jsonable_encoder
+
+# Before REST calls
+company_json = jsonable_encoder(company)  # Handles datetime → string
+result = ers.score_company(company_json, base_url="http://127.0.0.1:8000")
+```
+
+**Response Handling:**
+```python
+# SDK handles JSON encoding internally
+det_result = ers.score_company(company_dict, base_url="http://127.0.0.1:8000")
+
+# For blending, SDK normalizes payloads automatically
+blended = ers.blend_scores(ai_score_dict, det_result, ai_weight=0.5)
+```
+
+**SDK Internal Safety:** The SDK uses `jsonable_encoder` internally, so dict/Pydantic inputs work safely.
+
+## Troubleshooting
+
+| Issue | Solution |
+|-------|----------|
+| `ImportError: No module named echo_ridge_scoring` | Install wheel: `poetry build && pip install dist/echo_ridge_scoring-*.whl` |
+| `TypeError: Object of type datetime is not JSON serializable` | Use `jsonable_encoder(company)` before REST calls |
+| `AttributeError: 'ScoringPayloadV2' has no attribute 'get'` | Convert to dict: `det_result.model_dump(mode="json")` or use SDK functions |
+| All zeros `final_score` | Check feasibility gates; toggle masking with `ECHO_RIDGE_MASK_ON_INFEASIBLE=false`; ensure minimal viable fields |
+
+## API Endpoints
+
+- **POST /score** — Score single company
+- **POST /score/batch** — Score multiple companies  
+- **GET /healthz** — Health check
+- **GET /stats** — Service statistics and normalization context
+
+## Versioning & Config
+
+**Engine Version:** Surfaced in `payload.metadata.version.engine` (currently "1.1.0")
+
+**Weights:** Defined in `weights.yaml` with production-ready calibration:
+- Digital: 25%, Operations: 20%, Info Flow: 20%, Market: 20%, Budget: 15%
+
+**Masking Control:** `ECHO_RIDGE_MASK_ON_INFEASIBLE` environment variable (default: "true")
+
+---
+
+**Status:** ✅ Production-ready for Roman's hybrid scoring pipeline
