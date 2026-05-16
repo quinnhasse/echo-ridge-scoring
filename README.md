@@ -1,273 +1,129 @@
-# Echo Ridge Scoring Package
+# echo-ridge-scoring
 
-Deterministic DOIMB scoring (0–100) + risk/feasibility assessment designed to plug into Roman's agentic pipeline as a **parallel** scorer to AI/DIMB analysis.
+Deterministic AI-readiness scoring for SMB companies. Scores across five dimensions (Digital, Operations, Information Flow, Market, Budget) with risk assessment and feasibility gates.
 
-The system provides a two-stage architecture: Roman's agentic discovery produces rich contextual data, while Echo Ridge deterministic scoring provides mathematical precision. Scores blend using configurable strategies to combine contextual intelligence with quantitative analysis.
+## What it does
 
-## Quick Start
+- REST API for single and batch scoring
+- JWT auth + per-user API keys with rate limiting
+- Postgres persistence for scoring runs via Alembic migrations
+- Structured JSON logging and per-request IDs
 
-### Prerequisites
-- Python 3.11+
-- Poetry (for dependency management)
-- Roman's repo at `examples/echoridge_search_backend/` (reference only)
+## Data model
 
-### Install
+```
+users
+  id, email, hashed_password (bcrypt), is_active, created_at
+
+api_keys
+  id, user_id (FK), name, key_prefix (8 chars), key_hash (SHA-256),
+  rate_limit_rpm, is_active, created_at, last_used_at
+
+norm_contexts
+  id, version, stats_json, confidence_threshold, fitted,
+  companies_count, checksum, created_at
+
+scoring_results
+  id, company_id, domain, final_score, confidence, overall_risk,
+  overall_feasible, payload_json (full audit), norm_context_version,
+  processing_time_ms, batch_id, created_at
+
+batch_runs
+  id, batch_id, input/output file paths + checksums,
+  companies_processed/succeeded/failed, processing_time_ms,
+  started_at, completed_at
+```
+
+## Auth flow
+
+1. Register: `POST /auth/register` with `{email, password}`
+2. Get token: `POST /auth/token` with form-encoded `username` + `password` → JWT (24h)
+3. Use token: `Authorization: Bearer <token>` on protected endpoints
+4. API keys: `POST /auth/keys` (requires JWT) → returns raw key once; use as `X-Api-Key: <key>`
+
+Unauthenticated requests to scoring endpoints return **401**. Rate-limited requests return **429**.
+
+## Local run (Docker)
+
 ```bash
-# Development install
+docker compose up
+```
+
+This starts Postgres, runs Alembic migrations, seeds an admin user, and starts the API on port 8000.
+
+Default seed credentials:
+- Email: `admin@example.com`
+- Password: `changeme123`
+
+Get a token:
+```bash
+curl -X POST http://localhost:8000/auth/token \
+  -d "username=admin@example.com&password=changeme123"
+```
+
+Score a company:
+```bash
+curl -X POST http://localhost:8000/score \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "company_id": "acme-001",
+    "domain": "acme.com",
+    "digital": {"pagespeed": 85, "crm_flag": true, "ecom_flag": false},
+    "ops": {"employees": 25, "locations": 2, "services_count": 5},
+    "info_flow": {"daily_docs_est": 150},
+    "market": {"competitor_density": 8, "industry_growth_pct": 3.5, "rivalry_index": 0.7},
+    "budget": {"revenue_est_usd": 1500000},
+    "meta": {"scrape_ts": "2025-01-01T00:00:00Z", "source_confidence": 0.85}
+  }'
+```
+
+## Local run (without Docker)
+
+```bash
 poetry install
-
-# Or build and install wheel
-poetry build && python -m pip install --force-reinstall dist/echo_ridge_scoring-*.whl
-```
-
-### Run API
-```bash
-# Standard mode (infeasible companies get masked/zeroed scores)
+# SQLite by default
 poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
-
-# Development mode (no masking - shows numeric scores even when infeasible)
-ECHO_RIDGE_MASK_ON_INFEASIBLE=false poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-## Minimal Integration (10 Lines)
-
-Drop this into Roman's scoring stage for immediate deterministic + blended scoring:
-
-```python
-import echo_ridge_scoring as ers
-from fastapi.encoders import jsonable_encoder
-
-# Adapt Roman's data to Echo Ridge format
-company, warnings = ers.to_company_schema(roman_record_dict)
-
-# Score via REST API (JSON-safe)
-company_json = jsonable_encoder(company)
-det_result = ers.score_company(company_json, base_url="http://127.0.0.1:8000")
-
-# Blend with Roman's AI score  
-blended = ers.blend_scores(ai_score_dict, det_result, ai_weight=0.5)
-
-# Output for scores/*.jsonl
-print(f"Deterministic: {det_result['final_score']}, Blended: {blended['blended_score']['overall_score']:.2f}")
+Run migrations (Postgres):
+```bash
+export DATABASE_URL=postgresql://user:pass@localhost:5432/echo_ridge_scoring
+alembic upgrade head
+python -m scripts.seed
 ```
 
-## Roman Adapter Notes
-
-**Field Mapping:**
-- `entity_id` or `source_id` → `company_id` (required)
-- `metadata.domain` or `website` URL → `domain` (with fallback parsing)
-- `created_at` → `meta.scrape_ts` (ISO timestamp parsing)
-- `confidence_score` → `meta.source_confidence` (0.0-1.0)
-
-**Content Analysis:**
-- WebSnapshot text → `digital.crm_flag` (detects "customer portal", "member login", "dashboard")
-- WebSnapshot text → `digital.ecom_flag` (detects "checkout", "purchase", "payment", "stripe")
-
-**Expected Warnings:** 9-10 warnings per conversion due to missing quantitative business metrics (normal behavior).
-
-**Determinism Policy:** No guessed business facts. Missing fields get explicit defaults with warnings. No hallucination.
-
-## Feasibility & Masking Behavior
-
-**Default Behavior (Masked):** Infeasible companies produce zeroed subscores to enforce strict triage.
-
-**Development Mode (Unmasked):** Shows numeric scores even when infeasible for debugging.
+## Tests
 
 ```bash
-# Strict mode (production)
-poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
-
-# Dev mode (see all scores)  
-ECHO_RIDGE_MASK_ON_INFEASIBLE=false poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
+poetry run pytest -q
 ```
 
-**When to use each:**
-- **Masked:** Production triage where only viable companies should score high
-- **Unmasked:** Development debugging to see mathematical scoring regardless of feasibility
+Coverage report is printed automatically. The suite requires >=80% coverage on `src/`.
 
-## JSON-Safety Tips
+Tests use an in-memory SQLite database — no external dependencies needed.
 
-**Request Encoding:**
-```python
-from fastapi.encoders import jsonable_encoder
+## Endpoints
 
-# Before REST calls
-company_json = jsonable_encoder(company)  # Handles datetime → string
-result = ers.score_company(company_json, base_url="http://127.0.0.1:8000")
-```
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | /auth/register | none | Create account |
+| POST | /auth/token | none | Get JWT |
+| POST | /auth/keys | JWT | Create API key |
+| GET | /auth/keys | JWT | List API keys |
+| DELETE | /auth/keys/{id} | JWT | Revoke API key |
+| POST | /score | JWT or API key | Score single company |
+| POST | /score/batch | JWT or API key | Score multiple companies |
+| GET | /healthz | none | Health check |
+| GET | /stats | JWT or API key | Service stats |
 
-**Response Handling:**
-```python
-# SDK handles JSON encoding internally
-det_result = ers.score_company(company_dict, base_url="http://127.0.0.1:8000")
+## Configuration
 
-# For blending, SDK normalizes payloads automatically
-blended = ers.blend_scores(ai_score_dict, det_result, ai_weight=0.5)
-```
-
-**SDK Internal Safety:** The SDK uses `jsonable_encoder` internally, so dict/Pydantic inputs work safely.
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| `ImportError: No module named echo_ridge_scoring` | Install wheel: `poetry build && pip install dist/echo_ridge_scoring-*.whl` |
-| `TypeError: Object of type datetime is not JSON serializable` | Use `jsonable_encoder(company)` before REST calls |
-| `AttributeError: 'ScoringPayloadV2' has no attribute 'get'` | Convert to dict: `det_result.model_dump(mode="json")` or use SDK functions |
-| All zeros `final_score` | Check feasibility gates; toggle masking with `ECHO_RIDGE_MASK_ON_INFEASIBLE=false`; ensure minimal viable fields |
-
-## API Endpoints
-
-- **POST /score** — Score single company
-- **POST /score/batch** — Score multiple companies  
-- **GET /healthz** — Health check
-- **GET /stats** — Service statistics and normalization context
-
-## Versioning & Config
-
-**Engine Version:** Surfaced in `payload.metadata.version.engine` (currently "1.1.0")
-
-**Weights:** Defined in `weights.yaml` with production-ready calibration:
-- Digital: 25%, Operations: 20%, Info Flow: 20%, Market: 20%, Budget: 15%
-
-**Masking Control:** `ECHO_RIDGE_MASK_ON_INFEASIBLE` environment variable (default: "true")
-
----
-
-**Status:** ✅ Production-ready for Roman's hybrid scoring pipeline# Echo Ridge Scoring Package
-
-Deterministic DOIMB scoring (0–100) + risk/feasibility assessment designed to plug into Roman's agentic pipeline as a **parallel** scorer to AI/DIMB analysis.
-
-The system provides a two-stage architecture: Roman's agentic discovery produces rich contextual data, while Echo Ridge deterministic scoring provides mathematical precision. Scores blend using configurable strategies to combine contextual intelligence with quantitative analysis.
-
-## Quick Start
-
-### Prerequisites
-- Python 3.11+
-- Poetry (for dependency management)
-- Roman's repo at `examples/echoridge_search_backend/` (reference only)
-
-### Install
-```bash
-# Development install
-poetry install
-
-# Or build and install wheel
-poetry build && python -m pip install --force-reinstall dist/echo_ridge_scoring-*.whl
-```
-
-### Run API
-```bash
-# Standard mode (infeasible companies get masked/zeroed scores)
-poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
-
-# Development mode (no masking - shows numeric scores even when infeasible)
-ECHO_RIDGE_MASK_ON_INFEASIBLE=false poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
-```
-
-## Minimal Integration (10 Lines)
-
-Drop this into Roman's scoring stage for immediate deterministic + blended scoring:
-
-```python
-import echo_ridge_scoring as ers
-from fastapi.encoders import jsonable_encoder
-
-# Adapt Roman's data to Echo Ridge format
-company, warnings = ers.to_company_schema(roman_record_dict)
-
-# Score via REST API (JSON-safe)
-company_json = jsonable_encoder(company)
-det_result = ers.score_company(company_json, base_url="http://127.0.0.1:8000")
-
-# Blend with Roman's AI score  
-blended = ers.blend_scores(ai_score_dict, det_result, ai_weight=0.5)
-
-# Output for scores/*.jsonl
-print(f"Deterministic: {det_result['final_score']}, Blended: {blended['blended_score']['overall_score']:.2f}")
-```
-
-## Roman Adapter Notes
-
-**Field Mapping:**
-- `entity_id` or `source_id` → `company_id` (required)
-- `metadata.domain` or `website` URL → `domain` (with fallback parsing)
-- `created_at` → `meta.scrape_ts` (ISO timestamp parsing)
-- `confidence_score` → `meta.source_confidence` (0.0-1.0)
-
-**Content Analysis:**
-- WebSnapshot text → `digital.crm_flag` (detects "customer portal", "member login", "dashboard")
-- WebSnapshot text → `digital.ecom_flag` (detects "checkout", "purchase", "payment", "stripe")
-
-**Expected Warnings:** 9-10 warnings per conversion due to missing quantitative business metrics (normal behavior).
-
-**Determinism Policy:** No guessed business facts. Missing fields get explicit defaults with warnings. No hallucination.
-
-## Feasibility & Masking Behavior
-
-**Default Behavior (Masked):** Infeasible companies produce zeroed subscores to enforce strict triage.
-
-**Development Mode (Unmasked):** Shows numeric scores even when infeasible for debugging.
-
-```bash
-# Strict mode (production)
-poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
-
-# Dev mode (see all scores)  
-ECHO_RIDGE_MASK_ON_INFEASIBLE=false poetry run uvicorn src.api.main:app --host 127.0.0.1 --port 8000
-```
-
-**When to use each:**
-- **Masked:** Production triage where only viable companies should score high
-- **Unmasked:** Development debugging to see mathematical scoring regardless of feasibility
-
-## JSON-Safety Tips
-
-**Request Encoding:**
-```python
-from fastapi.encoders import jsonable_encoder
-
-# Before REST calls
-company_json = jsonable_encoder(company)  # Handles datetime → string
-result = ers.score_company(company_json, base_url="http://127.0.0.1:8000")
-```
-
-**Response Handling:**
-```python
-# SDK handles JSON encoding internally
-det_result = ers.score_company(company_dict, base_url="http://127.0.0.1:8000")
-
-# For blending, SDK normalizes payloads automatically
-blended = ers.blend_scores(ai_score_dict, det_result, ai_weight=0.5)
-```
-
-**SDK Internal Safety:** The SDK uses `jsonable_encoder` internally, so dict/Pydantic inputs work safely.
-
-## Troubleshooting
-
-| Issue | Solution |
-|-------|----------|
-| `ImportError: No module named echo_ridge_scoring` | Install wheel: `poetry build && pip install dist/echo_ridge_scoring-*.whl` |
-| `TypeError: Object of type datetime is not JSON serializable` | Use `jsonable_encoder(company)` before REST calls |
-| `AttributeError: 'ScoringPayloadV2' has no attribute 'get'` | Convert to dict: `det_result.model_dump(mode="json")` or use SDK functions |
-| All zeros `final_score` | Check feasibility gates; toggle masking with `ECHO_RIDGE_MASK_ON_INFEASIBLE=false`; ensure minimal viable fields |
-
-## API Endpoints
-
-- **POST /score** — Score single company
-- **POST /score/batch** — Score multiple companies  
-- **GET /healthz** — Health check
-- **GET /stats** — Service statistics and normalization context
-
-## Versioning & Config
-
-**Engine Version:** Surfaced in `payload.metadata.version.engine` (currently "1.1.0")
-
-**Weights:** Defined in `weights.yaml` with production-ready calibration:
-- Digital: 25%, Operations: 20%, Info Flow: 20%, Market: 20%, Budget: 15%
-
-**Masking Control:** `ECHO_RIDGE_MASK_ON_INFEASIBLE` environment variable (default: "true")
-
----
-
-**Status:** ✅ Production-ready for Roman's hybrid scoring pipeline
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `sqlite:///echo_ridge_scoring.db` | SQLAlchemy DSN |
+| `JWT_SECRET_KEY` | `change-me-in-production-32chars!!` | HMAC signing key |
+| `JWT_EXPIRE_HOURS` | `24` | Token lifetime |
+| `REGISTRATION_OPEN` | `true` | Allow public registration |
+| `SEED_EMAIL` | `admin@example.com` | Seed user email |
+| `SEED_PASSWORD` | `changeme123` | Seed user password |
