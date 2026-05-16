@@ -1,0 +1,50 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: echo_ridge
+      POSTGRES_PASSWORD: echo_ridge_secret
+      POSTGRES_DB: echo_ridge_scoring
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U echo_ridge -d echo_ridge_scoring"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build: .
+    command: >
+      sh -c "alembic upgrade head && python -m scripts.seed"
+    environment:
+      DATABASE_URL: postgresql://echo_ridge:echo_ridge_secret@db:5432/echo_ridge_scoring
+      SEED_EMAIL: admin@example.com
+      SEED_PASSWORD: changeme123
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://echo_ridge:echo_ridge_secret@db:5432/echo_ridge_scoring
+      JWT_SECRET_KEY: change-me-for-production
+      JWT_EXPIRE_HOURS: "24"
+      REGISTRATION_OPEN: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  postgres_data:
